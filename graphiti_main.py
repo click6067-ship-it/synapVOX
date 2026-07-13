@@ -40,5 +40,8 @@ corpus = {
 KEY = os.environ.get("DEMO_API_KEY", "demo-bio")
 key_map = {hashlib.sha256(KEY.encode()).hexdigest(): PROJECT}
 
+# SVX_READONLY=1 이면 쓰기(ingest/reset) 차단 — 사전 시드된 그래프만 조회하는 공개 배포용.
+READONLY = os.environ.get("SVX_READONLY", "").strip() in ("1", "true", "yes")
+
 engine = GraphitiEngine()
-app = create_app(engine, corpus, key_map, os.environ.get("DEMO_CORS", "*").split(","))
+app = create_app(engine, corpus, key_map, os.environ.get("DEMO_CORS", "*").split(","), readonly=READONLY)

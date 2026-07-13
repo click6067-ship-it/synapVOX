@@ -1,0 +1,33 @@
+# Render Blueprint — SynapVox Graphiti 판 (쿼리 전용 공개 배포).
+#
+# 아키텍처: 이 웹서비스(graphiti_main:app) ── neo4j+s:// ──▶ Neo4j Aura Free(별도 생성).
+# 그래프는 배포 전에 scripts/seed_graphiti.py 로 Aura 에 사전 시드하고, 배포 앱은
+# SVX_READONLY=1 로 조회·검색·RAG 만 노출한다(익명 남용에 의한 OpenAI 비용 방어).
+#
+# 사용법: Render 대시보드 → New → Blueprint → 이 repo 선택 → sync:false 시크릿 입력.
+services:
+  - type: web
+    name: synapvox-graphiti
+    runtime: python
+    plan: free
+    branch: main
+    buildCommand: pip install -r requirements-graphiti-deploy.txt
+    startCommand: uvicorn graphiti_main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /config
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.3"
+      - key: SVX_READONLY          # 쿼리 전용 — ingest/reset 차단
+        value: "1"
+      - key: NEO4J_USER
+        value: neo4j
+      - key: DEMO_API_KEY          # 프론트 X-API-Key (공개 데모 키)
+        value: demo-bio
+      - key: DEMO_CORS
+        value: "*"
+      - key: OPENAI_API_KEY        # ▼ 대시보드에서 직접 입력(시크릿)
+        sync: false
+      - key: NEO4J_URI             # 예: neo4j+s://xxxx.databases.neo4j.io
+        sync: false
+      - key: NEO4J_PASSWORD        # Aura 인스턴스 생성 시 발급된 비밀번호
+        sync: false

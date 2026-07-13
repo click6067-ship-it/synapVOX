@@ -1,0 +1,5 @@
+# Render 배포용 (Graphiti 판) — 서버(FastAPI/uvicorn) + Graphiti.
+# graphiti-core 가 neo4j·openai 를 함께 끌어온다. langgraph 는 커스텀 svx 전용이라 불필요.
+-r requirements-graphiti.txt
+fastapi
+uvicorn

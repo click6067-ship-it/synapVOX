@@ -57,8 +57,37 @@ docker run -d --name svx-neo4j -p 7687:7687 -p 7474:7474 \
 - `gsvx/api.py` — FastAPI(async), 프론트 계약 그대로.
 - `graphiti_main.py` — 엔트리포인트(캠벨 코퍼스를 episode로).
 
-## 배포
-Graphiti는 그래프 DB 연결을 유지해야 해서 Vercel 서버리스와는 안 맞습니다. 배포한다면 컨테이너 호스트(Railway/Render/Fly)
-+ **Neo4j Aura**(무료 클라우드) 조합이 자연스럽습니다. (현재는 로컬 우선 — 배포는 후속.)
+## 배포 — Render + Neo4j Aura Free (쿼리 전용)
 
-> 커스텀 판(`svx/`, Vercel 배포본)도 레포에 보존돼 있습니다. 두 구현을 비교 참고 가능.
+Graphiti는 그래프 DB 연결을 상주시켜야 해서 Vercel 서버리스와는 안 맞습니다. 그래서
+**Render(웹서비스) + Neo4j Aura Free(관리형 그래프 DB)** 조합으로 배포합니다. 커스텀 판
+(`svx/`)은 `synapvox.vercel.app` 그대로 두고, Graphiti 판은 별도 URL이 됩니다.
+
+**비용/남용 방어**: 공개 앱은 `SVX_READONLY=1`로 **조회·검색·RAG만** 노출합니다.
+세션당 LLM 엔티티/관계 추출이 드는 `ingest`는 막고, 그래프는 배포 전에 **한 번만 사전 시드**합니다.
+
+```
+[Neo4j Aura Free] ◀─ scripts/seed_graphiti.py 로 6강 사전 시드(로컬 1회, OpenAI 토큰)
+      ▲ neo4j+s://
+[Render Web Service] ── graphiti_main:app (SVX_READONLY=1) ── 조회만
+```
+
+### 절차
+1. **Neo4j Aura Free 인스턴스 생성** — https://neo4j.com/product/auradb (Free 티어).
+   생성 시 나오는 **접속 URI**(`neo4j+s://xxxx.databases.neo4j.io`)와 **비밀번호**를 저장.
+2. **로컬 `.env`에 Aura 값 넣고 사전 시드** (OpenAI 토큰 소모, 1회):
+   ```bash
+   #   NEO4J_URI=neo4j+s://xxxx.databases.neo4j.io
+   #   NEO4J_USER=neo4j
+   #   NEO4J_PASSWORD=<aura-password>
+   #   OPENAI_API_KEY=sk-...
+   .venv/bin/pip install -r requirements-graphiti-deploy.txt
+   .venv/bin/python scripts/seed_graphiti.py --reset
+   ```
+3. **Render 배포** — 대시보드 → New → **Blueprint** → 이 repo 선택 → `render.yaml`이 서비스를
+   구성. `sync:false`로 비워둔 시크릿 3개(`OPENAI_API_KEY`, `NEO4J_URI`, `NEO4J_PASSWORD`)를
+   Aura 값으로 입력 → Deploy.
+4. **확인** — `https://<서비스>.onrender.com/config`가 `{"engine":"graphiti","readonly":true}`,
+   루트(`/`)에서 그래프가 뜨고 질문(RAG)이 답하면 성공. (Free 티어는 유휴 후 첫 요청 콜드스타트 ~50s.)
+
+> 참고: 로컬 개발/전체 기능(ingest 포함)은 위 "## 실행"의 로컬 Neo4j 도커로. 커스텀 판(`svx/`, Vercel 배포본)도 레포에 보존돼 있어 두 구현을 비교 참고할 수 있습니다.

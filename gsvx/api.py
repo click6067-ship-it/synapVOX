@@ -14,7 +14,10 @@ from fastapi.responses import FileResponse
 STATIC = Path(__file__).parent.parent / "static"
 
 
-def create_app(engine, corpus, key_map, cors_origins):
+def create_app(engine, corpus, key_map, cors_origins, readonly=False):
+    """readonly=True 면 쓰기(ingest/reset)를 막는다 — 사전 시드된 그래프만 조회하는
+    공개 배포용(익명 사용자가 비싼 LLM 추출을 못 돌리게 비용/남용 방어)."""
+
     @asynccontextmanager
     async def lifespan(app):
         await engine.init()
@@ -33,6 +36,10 @@ def create_app(engine, corpus, key_map, cors_origins):
             raise HTTPException(401, "invalid API key")
         return pid
 
+    def _guard_write():
+        if readonly:
+            raise HTTPException(403, "읽기 전용 배포입니다 — 사전 시드된 그래프만 조회할 수 있습니다.")
+
     @app.get("/")
     def index():
         return FileResponse(STATIC / "graph.html")
@@ -41,7 +48,7 @@ def create_app(engine, corpus, key_map, cors_origins):
     def config():
         return {"rag_enabled": True, "chat_model": engine.answer_model,
                 "embed_model": engine.embed_model, "engine": "graphiti",
-                "extract_model": engine.extract_model}
+                "extract_model": engine.extract_model, "readonly": readonly}
 
     @app.get("/corpus")
     async def corpus_list(pid: str = Depends(project_id)):
@@ -52,6 +59,7 @@ def create_app(engine, corpus, key_map, cors_origins):
 
     @app.post("/ingest")
     async def ingest(body: dict, pid: str = Depends(project_id)):
+        _guard_write()
         key = body.get("session_key")
         s = corpus.get(key)
         if not s:
@@ -62,6 +70,7 @@ def create_app(engine, corpus, key_map, cors_origins):
 
     @app.post("/ingest-text")
     async def ingest_text(body: dict, pid: str = Depends(project_id)):
+        _guard_write()
         text = (body.get("text") or "").strip()
         if not text:
             raise HTTPException(400, "text가 비어 있습니다")
@@ -71,6 +80,7 @@ def create_app(engine, corpus, key_map, cors_origins):
 
     @app.post("/reset")
     async def reset(pid: str = Depends(project_id)):
+        _guard_write()
         await engine.reset(pid)
         return {"ok": True}
 
