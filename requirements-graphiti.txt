@@ -1,0 +1,3 @@
+# Graphiti 판 (docs/graphiti.md) — Neo4j 그래프 DB 필요
+# graphiti-core가 neo4j·openai 등을 함께 끌어온다. 서버용 fastapi/uvicorn은 requirements-dev.txt 참고.
+graphiti-core @ git+https://github.com/click6067-ship-it/graphiti.git
