@@ -1,0 +1,1291 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SynapVox — 개념 지식 그래프 (캠벨 생명과학)</title>
+<style>
+  /* ---- tokens (light + dark) ---------------------------------------- */
+  :root{
+    --bg:#f4f1e9; --panel:#fffdf7; --panel-2:#faf7ef;
+    --ink:#22201a; --sub:#726d5f; --faint:#948d7c;
+    --line:#e4ded0; --line-2:#efe9db;
+
+    /* session family = muted slate-indigo */
+    --sess:#41598a; --sess-dk:#2e4066; --sess-soft:#e7ebf4;
+    /* concept family = botanical green */
+    --conc:#2f6f5b; --conc-dk:#1f4d3f; --conc-soft:#e2efe8;
+
+    /* edge families */
+    --e-mentions:#b7ccbf;
+    --e-cooccur:#cdc4ae;
+    --e-next:#9aa2b6;
+    --e-continues:#b45a2b;   /* semantic continuation — emphasized */
+    --e-expands:#987a1c;     /* semantic expansion — emphasized */
+
+    --mark:#f4e6b8;
+    --shadow:0 1px 2px rgba(40,36,26,.05),0 6px 20px rgba(40,36,26,.05);
+    --radius:12px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#17160f; --panel:#201e16; --panel-2:#1b1a12;
+      --ink:#ece7d8; --sub:#a49d89; --faint:#7d7663;
+      --line:#332f22; --line-2:#2a2619;
+      --sess:#8ea3d0; --sess-dk:#b3c1e2; --sess-soft:#242a3a;
+      --conc:#66b598; --conc-dk:#8fd0b6; --conc-soft:#1c2b24;
+      --e-mentions:#3f5147; --e-cooccur:#4a4636; --e-next:#565d70;
+      --e-continues:#cf7b48; --e-expands:#c2a03f;
+      --mark:#5a4e22;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 6px 22px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#17160f; --panel:#201e16; --panel-2:#1b1a12;
+    --ink:#ece7d8; --sub:#a49d89; --faint:#7d7663;
+    --line:#332f22; --line-2:#2a2619;
+    --sess:#8ea3d0; --sess-dk:#b3c1e2; --sess-soft:#242a3a;
+    --conc:#66b598; --conc-dk:#8fd0b6; --conc-soft:#1c2b24;
+    --e-mentions:#3f5147; --e-cooccur:#4a4636; --e-next:#565d70;
+    --e-continues:#cf7b48; --e-expands:#c2a03f;
+    --mark:#5a4e22;
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f1e9; --panel:#fffdf7; --panel-2:#faf7ef;
+    --ink:#22201a; --sub:#726d5f; --faint:#948d7c;
+    --line:#e4ded0; --line-2:#efe9db;
+    --sess:#41598a; --sess-dk:#2e4066; --sess-soft:#e7ebf4;
+    --conc:#2f6f5b; --conc-dk:#1f4d3f; --conc-soft:#e2efe8;
+    --e-mentions:#b7ccbf; --e-cooccur:#cdc4ae; --e-next:#9aa2b6;
+    --e-continues:#b45a2b; --e-expands:#987a1c; --mark:#f4e6b8;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:system-ui,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+    line-height:1.5; display:flex; flex-direction:column; overflow:hidden;
+  }
+  .serif{font-family:Georgia,"Nanum Myeongjo","Batang","Times New Roman",serif}
+
+  /* ---- top bar ------------------------------------------------------- */
+  .topbar{
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    padding:12px 20px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .topbar h1{font-size:19px; margin:0; letter-spacing:-.01em}
+  .topbar h1 b{color:var(--conc); font-weight:700}
+  .topbar .tag{color:var(--sub); font-size:12.5px}
+  .topbar .spacer{flex:1}
+  .conn{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:6px}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .conn.ok .dot{background:var(--conc)}
+  .conn.bad .dot{background:var(--e-continues)}
+  .theme-btn{
+    border:1px solid var(--line); background:var(--panel-2); color:var(--sub);
+    border-radius:8px; padding:5px 10px; font:inherit; font-size:12px; cursor:pointer;
+  }
+
+  /* ---- 3-column layout ---------------------------------------------- */
+  .app{flex:1; display:grid; grid-template-columns:300px minmax(0,1fr) 372px; min-height:0}
+  .col{min-height:0; overflow:auto; padding:16px}
+  .col.left{border-right:1px solid var(--line); background:var(--panel-2)}
+  .col.center{overflow:hidden; display:flex; flex-direction:column; padding:0; background:var(--bg)}
+  .col.right{border-left:1px solid var(--line); background:var(--panel-2)}
+
+  h2{font-size:12px; text-transform:none; letter-spacing:.01em; color:var(--sub);
+     margin:0 0 10px; font-weight:600}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+        box-shadow:var(--shadow)}
+
+  /* ---- left: corpus + workflow -------------------------------------- */
+  .btn-row{display:flex; gap:7px; margin-bottom:14px; flex-wrap:wrap}
+  button.act{
+    padding:7px 12px; border:1px solid var(--conc); background:var(--conc); color:#fff;
+    border-radius:8px; font:inherit; font-size:12.5px; cursor:pointer; transition:opacity .15s;
+  }
+  button.act.ghost{background:transparent; color:var(--conc)}
+  button.act.warn{border-color:var(--e-continues); color:var(--e-continues); background:transparent}
+  button.act:disabled{opacity:.4; cursor:not-allowed}
+  button.act:not(:disabled):hover{opacity:.85}
+
+  .sess-list{display:flex; flex-direction:column; gap:0}
+  .sess-item{
+    display:grid; grid-template-columns:26px 1fr auto; align-items:center; gap:9px;
+    padding:9px 10px; border-top:1px solid var(--line-2); cursor:default;
+  }
+  .sess-item:first-child{border-top:0}
+  .sess-item.ingested{cursor:pointer}
+  .sess-item.ingested:hover{background:var(--panel-2)}
+  .sess-item.next{background:var(--conc-soft)}
+  .seq{font-variant-numeric:tabular-nums; font-size:12px; color:var(--faint);
+       border:1px solid var(--line); border-radius:6px; text-align:center; padding:1px 0}
+  .sess-item .t{font-size:12.7px; line-height:1.35}
+  .sess-item .ch{font-size:11px; color:var(--faint); margin-top:1px}
+  .state{font-size:10.5px; padding:2px 7px; border-radius:99px; white-space:nowrap}
+  .state.on{background:var(--conc-soft); color:var(--conc-dk)}
+  .state.off{background:var(--line-2); color:var(--faint)}
+
+  /* pipeline animation */
+  #pipeline{margin-top:14px; padding:12px; display:none}
+  #pipeline.show{display:block}
+  #pipeline .head{font-size:11.5px; color:var(--sub); margin-bottom:9px}
+  .pstep{
+    display:grid; grid-template-columns:18px 1fr auto; align-items:center; gap:8px;
+    padding:6px 8px; border-radius:7px; font-size:12px; color:var(--faint);
+    opacity:.5; transition:all .3s ease; margin-bottom:2px;
+  }
+  .pstep .ring{width:11px;height:11px;border-radius:50%;border:1.5px solid var(--line); justify-self:center}
+  .pstep.active{opacity:1; color:var(--ink); background:var(--conc-soft)}
+  .pstep.active .ring{border-color:var(--conc); box-shadow:0 0 0 3px var(--conc-soft)}
+  .pstep.done{opacity:1; color:var(--sub)}
+  .pstep.done .ring{background:var(--conc); border-color:var(--conc)}
+  .pstep .cnt{font-variant-numeric:tabular-nums; font-size:11.5px; font-weight:600}
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:12px}
+  .stat{background:var(--panel-2); border:1px solid var(--line-2); border-radius:8px; padding:7px 9px}
+  .stat .k{font-size:10.5px; color:var(--faint)}
+  .stat .v{font-size:15px; font-variant-numeric:tabular-nums; font-weight:600}
+  .stat .v .d{font-size:11px; color:var(--conc); font-weight:600; margin-left:4px}
+
+  /* text-ingest card */
+  .ti-head{display:flex; align-items:center; justify-content:space-between; margin:18px 0 10px}
+  .ti-head h2{margin:0}
+  #textCard{padding:14px}
+  .ti-field{margin-bottom:9px}
+  .ti-field:last-of-type{margin-bottom:0}
+  .ti-field label{display:block; font-size:11px; color:var(--sub); margin-bottom:3px}
+  .ti-field input,.ti-field textarea{
+    width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:8px;
+    font:inherit; font-size:12.5px; background:var(--panel-2); color:var(--ink);
+  }
+  .ti-field textarea{min-height:98px; max-height:280px; resize:vertical; line-height:1.5}
+  .ti-field input:focus,.ti-field textarea:focus{outline:2px solid var(--conc-soft); border-color:var(--conc)}
+  .ti-hint{font-size:10.5px; color:var(--faint); margin-top:3px}
+  #tiSubmit{width:100%; margin-top:12px}
+  #tiMsg{font-size:11.5px; margin-top:8px; min-height:1em; color:var(--sub)}
+  #tiMsg.err{color:var(--e-continues)}
+  #tiMsg.ok{color:var(--conc)}
+
+  /* ---- center: graph ------------------------------------------------- */
+  .gtools{
+    display:flex; align-items:center; gap:8px 14px; flex-wrap:wrap;
+    padding:10px 16px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  .filters{display:flex; gap:4px 12px; flex-wrap:wrap; align-items:center}
+  .filters label{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--sub); cursor:pointer}
+  .filters input{accent-color:var(--conc)}
+  .filters .sw{width:16px;height:0;border-top-width:3px;border-top-style:solid;display:inline-block;border-radius:2px}
+  .filters label.disabled{opacity:.4; cursor:not-allowed}
+  .gtools .spacer{flex:1}
+  .mini{border:1px solid var(--line); background:var(--panel-2); color:var(--sub);
+        border-radius:7px; padding:5px 10px; font:inherit; font-size:12px; cursor:pointer}
+  .mini:hover{color:var(--ink)}
+  #graphWrap{flex:1; position:relative; min-height:0; overflow:hidden}
+  #graph{width:100%; height:100%; display:block; touch-action:none}
+  .g-empty{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+           text-align:center; color:var(--sub); font-size:13px; padding:24px}
+  .legend{
+    position:absolute; left:14px; bottom:14px; background:var(--panel); border:1px solid var(--line);
+    border-radius:10px; padding:9px 11px; font-size:11px; color:var(--sub); box-shadow:var(--shadow);
+    max-width:240px;
+  }
+  .legend .row{display:flex; align-items:center; gap:7px; margin:3px 0}
+  .legend .row + .sep{margin-top:6px; padding-top:6px; border-top:1px solid var(--line-2)}
+  .legend .mk-sess{width:13px;height:13px;border-radius:4px;background:var(--sess);border:1px solid var(--sess-dk)}
+  .legend .mk-conc{width:13px;height:13px;border-radius:50%;background:var(--conc-soft);border:1.5px solid var(--conc)}
+  .legend .mk-line{width:20px;height:0;border-top-width:3px;border-top-style:solid;border-radius:2px}
+
+  /* svg graph elements */
+  .edge{fill:none; stroke-linecap:round}
+  .edge.mentions{stroke:var(--e-mentions); stroke-width:1}
+  .edge.cooccur{stroke:var(--e-cooccur); stroke-width:1; stroke-dasharray:2 4}
+  .edge.next{stroke:var(--e-next); stroke-width:1.5}
+  .edge.continues{stroke:var(--e-continues); stroke-width:3}
+  .edge.expands{stroke:var(--e-expands); stroke-width:3}
+  marker#arrow-next path{fill:var(--e-next)}
+  marker#arrow-continues path{fill:var(--e-continues)}
+  marker#arrow-expands path{fill:var(--e-expands)}
+  .node{cursor:pointer}
+  .node text{fill:var(--ink); font-size:11px; paint-order:stroke; stroke:var(--bg); stroke-width:3px}
+  .node-session rect{fill:var(--sess); stroke:var(--sess-dk); stroke-width:1.5}
+  .node-session text{fill:#fff; stroke:var(--sess-dk); stroke-width:2.5px; font-weight:600}
+  .node-concept circle{fill:var(--conc-soft); stroke:var(--conc); stroke-width:1.6}
+  .node-concept.stop circle{stroke-dasharray:2 2; opacity:.6}
+  .node.sel rect,.node.sel circle{stroke-width:3}
+  .node.sel circle{stroke:var(--conc-dk)}
+  .dim{opacity:.1; transition:opacity .3s}
+  .edge.dim{opacity:.05}
+  .hlring{fill:none; stroke:var(--e-expands); stroke-width:2.5; opacity:.9}
+  /* timeline mode arc labels (concept carried across sessions) */
+  .tl-lab{fill:var(--ink); font-size:11px; font-weight:500; paint-order:stroke; stroke:var(--bg); stroke-width:3.5px}
+
+  /* tooltip */
+  #tip{
+    position:fixed; pointer-events:none; z-index:50; background:var(--panel); color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:11.5px;
+    box-shadow:var(--shadow); max-width:230px; opacity:0; transition:opacity .12s; line-height:1.4;
+  }
+  #tip.on{opacity:1}
+  #tip .ty{font-size:10px; color:var(--faint); text-transform:uppercase; letter-spacing:.04em}
+
+  /* ---- right: search + detail --------------------------------------- */
+  .searchrow{display:flex; gap:6px; margin-bottom:8px}
+  .searchrow input{
+    flex:1; min-width:0; padding:8px 11px; border:1px solid var(--line); border-radius:8px;
+    font:inherit; font-size:13px; background:var(--panel); color:var(--ink);
+  }
+  .searchrow input:focus{outline:2px solid var(--conc-soft); border-color:var(--conc)}
+  .searchrow2{margin-bottom:6px}
+  .searchrow2 .act{width:100%}
+  /* RAG Q&A */
+  .rag-info{font-size:10.5px; margin:0 0 12px; letter-spacing:.01em}
+  .rag-info.on{color:var(--conc)}
+  .rag-info.off{color:var(--faint)}
+  .answer-card{margin-bottom:12px; padding:14px}
+  .ans-hd{font-size:11px; color:var(--faint); margin-bottom:8px; display:flex; align-items:center; gap:6px}
+  .ans-hd .dotm{width:6px;height:6px;border-radius:50%;background:var(--conc)}
+  .ans-body{font-size:13px; line-height:1.62; white-space:pre-wrap; word-break:break-word; color:var(--ink)}
+  .ans-body strong{font-weight:700; color:var(--ink)}
+  .cite{color:var(--sess-dk); background:var(--sess-soft); border-radius:4px; padding:0 4px; font-weight:600; font-size:12px}
+  .ans-src{margin-top:11px; padding-top:9px; border-top:1px solid var(--line-2); display:flex; align-items:center; gap:4px; flex-wrap:wrap}
+  .ans-src-lbl{font-size:11px; color:var(--sub); margin-right:2px}
+  .ans-loading{font-size:12.5px; color:var(--sub); display:flex; align-items:center; gap:9px}
+  .ans-loading small{color:var(--faint)}
+  .ans-err{font-size:12.5px; color:var(--e-continues)}
+  .spin{width:13px;height:13px;border-radius:50%;border:2px solid var(--line);border-top-color:var(--conc);display:inline-block;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #hits{margin-bottom:6px}
+  .hit{padding:10px 4px; border-top:1px solid var(--line-2); cursor:pointer}
+  .hit:first-child{border-top:0}
+  .hit:hover{background:var(--panel)}
+  .hit .m{font-size:11px; color:var(--faint); margin-bottom:3px; display:flex; gap:7px; flex-wrap:wrap}
+  .hit .m b{color:var(--sess); font-weight:600}
+  .hit .x{font-size:12.5px}
+  .chip{display:inline-block; font-size:10.5px; padding:1px 7px; border-radius:99px;
+        background:var(--conc-soft); color:var(--conc-dk); margin:1px 3px 1px 0; cursor:pointer}
+  .chip.sess{background:var(--sess-soft); color:var(--sess-dk)}
+
+  .detail{padding:14px}
+  .detail .kicker{font-size:11px; color:var(--faint); margin-bottom:2px}
+  .detail h3{margin:0 0 3px; font-size:18px; letter-spacing:-.01em}
+  .detail .meta{font-size:12px; color:var(--sub); margin-bottom:10px}
+  .detail .summary{font-size:13px; color:var(--ink); margin:8px 0 12px; padding-left:11px;
+                   border-left:2px solid var(--conc)}
+  .ev{border-top:1px solid var(--line-2); padding:9px 2px}
+  .ev .m{font-size:11px; color:var(--faint); margin-bottom:4px}
+  .ev .m b{color:var(--sess)}
+  .ev .txt{font-size:12.5px; line-height:1.55}
+  mark{background:var(--mark); color:inherit; padding:0 1px; border-radius:2px}
+  .seg{border-top:1px solid var(--line-2); padding:8px 2px; font-size:12.5px}
+  .seg .sp{font-size:11px; color:var(--sess); font-weight:600; margin-right:6px}
+  .empty{color:var(--sub); font-size:12.5px; padding:10px 2px}
+  .subhd{font-size:11px; color:var(--sub); font-weight:600; margin:14px 0 6px}
+
+  /* responsive: stack */
+  @media (max-width:1040px){
+    body{overflow:auto}
+    .app{grid-template-columns:1fr; min-height:0}
+    .col{overflow:visible}
+    .col.left,.col.right{border:0; border-bottom:1px solid var(--line)}
+    .col.center{height:70vh; min-height:440px}
+  }
+</style>
+</head>
+<body>
+  <header class="topbar">
+    <h1 class="serif">Synap<b>Vox</b></h1>
+    <span class="tag">캠벨 생명과학 강의 — 세션을 가로지르는 개념 지식 그래프</span>
+    <span class="spacer"></span>
+    <span id="conn" class="conn"><span class="dot"></span><span id="connText">연결 확인 중…</span></span>
+    <button class="theme-btn" id="themeBtn" title="라이트/다크 전환">화면 톤</button>
+  </header>
+
+  <div class="app">
+    <!-- ============ LEFT: workflow / ingest ============ -->
+    <div class="col left">
+      <h2>워크플로 — 세션 적재</h2>
+      <div class="btn-row">
+        <button class="act" id="btnNext">다음 세션 적재</button>
+        <button class="act ghost" id="btnAll">전체 적재</button>
+        <button class="act warn" id="btnReset">리셋</button>
+      </div>
+      <div class="card"><div class="sess-list" id="corpusList">
+        <div class="empty" style="padding:14px">코퍼스를 불러오는 중…</div>
+      </div></div>
+
+      <div id="addedWrap" style="display:none">
+        <div class="ti-head"><h2>추가된 세션</h2></div>
+        <div class="card"><div class="sess-list" id="addedList"></div></div>
+      </div>
+
+      <div class="ti-head">
+        <h2>텍스트로 강의 추가</h2>
+        <button class="mini" id="tiToggle" aria-expanded="true">접기</button>
+      </div>
+      <div class="card" id="textCard">
+        <div class="ti-field">
+          <label for="tiTitle">제목 <span style="color:var(--faint)">(선택)</span></label>
+          <input id="tiTitle" autocomplete="off" placeholder="예: 광합성 — 명반응">
+        </div>
+        <div class="ti-field">
+          <label for="tiChapter">단원 <span style="color:var(--faint)">(선택)</span></label>
+          <input id="tiChapter" autocomplete="off" placeholder="예: 8장 광합성">
+        </div>
+        <div class="ti-field">
+          <label for="tiText">본문 <span style="color:var(--e-continues)">*</span></label>
+          <textarea id="tiText" placeholder="강의 전사나 여러 섹션을 붙여넣으세요. 빈 줄로 섹션을 나눕니다."></textarea>
+        </div>
+        <div class="ti-field">
+          <label for="tiKeywords">핵심 개념 <span style="color:var(--faint)">(선택)</span></label>
+          <input id="tiKeywords" autocomplete="off" placeholder="쉼표로 구분 — 비우면 캠벨 생명과학 사전으로 자동 인식">
+        </div>
+        <button class="act" id="tiSubmit" disabled>그래프에 추가</button>
+        <div id="tiMsg"></div>
+      </div>
+
+      <div class="card" id="pipeline">
+        <div class="head" id="pipeHead">파이프라인</div>
+        <div id="pipeSteps"></div>
+        <div class="stat-grid" id="pipeStats"></div>
+      </div>
+    </div>
+
+    <!-- ============ CENTER: graph ============ -->
+    <div class="col center">
+      <div class="gtools">
+        <div class="filters" id="filters">
+          <label><input type="checkbox" data-f="mentions" checked><span class="sw" style="border-top-color:var(--e-mentions)"></span>개념 근거</label>
+          <label><input type="checkbox" data-f="cooccur" checked><span class="sw" style="border-top-color:var(--e-cooccur)"></span>동시출현</label>
+          <label><input type="checkbox" data-f="next" checked><span class="sw" style="border-top-color:var(--e-next)"></span>다음 세션</label>
+          <label><input type="checkbox" data-f="semantic" checked><span class="sw" style="border-top-color:var(--e-continues)"></span>연속·확장</label>
+          <label style="margin-left:2px"><input type="checkbox" id="sessOnly">세션↔세션만 보기</label>
+        </div>
+        <span class="spacer"></span>
+        <button class="mini" id="btnReflow">재정렬</button>
+        <button class="mini" id="btnClearHl" style="display:none">하이라이트 해제</button>
+      </div>
+      <div id="graphWrap">
+        <svg id="graph" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <marker id="arrow-next" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="arrow-continues" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="arrow-expands" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <g id="edgeLayer"></g>
+          <g id="nodeLayer"></g>
+        </svg>
+        <div class="g-empty" id="graphEmpty">세션을 적재하면 개념 그래프가 자랍니다.</div>
+        <div class="legend" id="legend" style="display:none">
+          <div class="row"><span class="mk-sess"></span>세션 (강의)</div>
+          <div class="row"><span class="mk-conc"></span>개념</div>
+          <div class="row sep"><span class="mk-line" style="border-top-color:var(--e-continues)"></span>연속 (CONTINUES)</div>
+          <div class="row"><span class="mk-line" style="border-top-color:var(--e-expands)"></span>확장 (EXPANDS)</div>
+          <div class="row"><span class="mk-line" style="border-top-color:var(--e-next)"></span>다음 세션</div>
+          <div class="row"><span class="mk-line" style="border-top-color:var(--e-mentions)"></span>개념 근거 / 동시출현</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RIGHT: search + detail ============ -->
+    <div class="col right">
+      <h2>검색 · AI 답변 — “X 관련 논의”</h2>
+      <div class="searchrow">
+        <input id="q" placeholder="예: 광합성 명반응 / ATP 합성 / 세포 호흡" autocomplete="off">
+        <button class="act ghost" id="btnSearch">검색</button>
+      </div>
+      <div class="searchrow2">
+        <button class="act" id="btnAsk" disabled title="RAG 설정 확인 중…">AI 답변</button>
+      </div>
+      <div id="ragInfo" class="rag-info off">RAG 설정 확인 중…</div>
+      <div id="answer"></div>
+      <div id="hits"></div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="detail" id="detail">
+          <div class="empty">그래프에서 <b>개념</b> 노드를 누르면 근거 세그먼트가, <b>세션</b> 노드를 누르면 강의 상세가 여기에 표시됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="tip"></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   SynapVox demo frontend — self-contained, vanilla JS, SVG force graph.
+   Backend contract (X-API-Key: demo-bio, same origin):
+     GET /corpus, POST /ingest, POST /reset, GET /graph,
+     GET /concept/{id}, GET /session/{id}, GET /search, GET /timeline
+   ===================================================================== */
+const API_KEY = "demo-bio";
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    method: opts.method || "GET",
+    headers: Object.assign({ "X-API-Key": API_KEY },
+      opts.body ? { "Content-Type": "application/json" } : {}),
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!r.ok) {
+    let msg = r.status + "";
+    try { msg = (await r.json()).detail || msg; } catch (e) {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+function setConn(state, text) {
+  const el = $("#conn");
+  el.className = "conn" + (state ? " " + state : "");
+  $("#connText").textContent = text;
+}
+
+/* ---- theme toggle -------------------------------------------------- */
+$("#themeBtn").addEventListener("click", () => {
+  const cur = document.documentElement.getAttribute("data-theme")
+    || (matchMedia("(prefers-color-scheme:dark)").matches ? "dark" : "light");
+  document.documentElement.setAttribute("data-theme", cur === "dark" ? "light" : "dark");
+});
+
+/* =====================================================================
+   1) CORPUS + INGEST WORKFLOW
+   ===================================================================== */
+let corpus = [];          // [{session_key, seq, title, chapter, ingested}]
+let busy = false;
+let addedSessions = [];   // sessions created via /ingest-text (kept client-side)
+
+async function loadCorpus() {
+  try {
+    const d = await api("/corpus");
+    corpus = (d.sessions || []).slice().sort((a, b) => (a.seq || 0) - (b.seq || 0));
+    setConn("ok", "연결됨");
+    renderCorpus();
+  } catch (e) {
+    setConn("bad", "백엔드 미연결 (" + e.message + ")");
+    $("#corpusList").innerHTML =
+      '<div class="empty" style="padding:14px">코퍼스를 불러올 수 없습니다.<br>서버(<code>uvicorn main:app</code>)를 켠 뒤 새로고침하세요.</div>';
+    updateButtons();
+  }
+}
+
+function nextSession() { return corpus.find(s => !s.ingested) || null; }
+
+function renderCorpus() {
+  const list = $("#corpusList");
+  if (!corpus.length) {
+    list.innerHTML = '<div class="empty" style="padding:14px">세션이 없습니다.</div>';
+    updateButtons(); return;
+  }
+  const nx = nextSession();
+  list.innerHTML = corpus.map(s => {
+    const isNext = nx && s.session_key === nx.session_key && !s.ingested;
+    return `<div class="sess-item ${s.ingested ? "ingested" : ""} ${isNext ? "next" : ""}"
+                 data-sess="${esc(s.session_key)}" data-ing="${s.ingested ? 1 : 0}">
+      <span class="seq">${esc(s.seq)}</span>
+      <span><span class="t">${esc(s.title)}</span>
+        ${s.chapter ? `<span class="ch">${esc(s.chapter)}</span>` : ""}</span>
+      <span class="state ${s.ingested ? "on" : "off"}">${s.ingested ? "적재됨" : (isNext ? "다음" : "대기")}</span>
+    </div>`;
+  }).join("");
+  list.querySelectorAll('.sess-item[data-ing="1"]').forEach(el =>
+    el.addEventListener("click", () => openSession(el.getAttribute("data-sess"))));
+  updateButtons();
+}
+
+function updateButtons() {
+  const nx = nextSession();
+  const anyIngested = corpus.some(s => s.ingested);
+  $("#btnNext").disabled = busy || !nx;
+  $("#btnAll").disabled = busy || !nx;
+  $("#btnReset").disabled = busy || !anyIngested;
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function animatePipeline(sessionKey, resp) {
+  const box = $("#pipeline"); box.classList.add("show");
+  $("#pipeHead").textContent = "파이프라인 — " + sessionKey;
+  const steps = resp.pipeline || [];
+  $("#pipeSteps").innerHTML = steps.map((p, i) =>
+    `<div class="pstep" data-i="${i}">
+       <span class="ring"></span>
+       <span>${esc(p.step)}</span>
+       <span class="cnt">${esc(p.count)}</span>
+     </div>`).join("");
+  $("#pipeStats").innerHTML = "";
+  for (let i = 0; i < steps.length; i++) {
+    const el = $(`.pstep[data-i="${i}"]`);
+    if (i > 0) $(`.pstep[data-i="${i - 1}"]`).classList.replace("active", "done");
+    el.classList.add("active");
+    await sleep(430);
+  }
+  if (steps.length) $(`.pstep[data-i="${steps.length - 1}"]`).classList.replace("active", "done");
+
+  const st = resp.stats || {};
+  const stat = (k, v, d) =>
+    `<div class="stat"><div class="k">${k}</div><div class="v">${v == null ? "–" : v}${
+      d ? `<span class="d">+${d}</span>` : ""}</div></div>`;
+  $("#pipeStats").innerHTML =
+    stat("세그먼트", st.segments) +
+    stat("근거(mentions)", st.mentions) +
+    stat("개념 누적", st.concepts_total, st.concepts_new) +
+    stat("새 관계", st.relations_new);
+}
+
+async function ingest(sessionKey) {
+  const resp = await api("/ingest", { method: "POST", body: { session_key: sessionKey } });
+  await animatePipeline(sessionKey, resp);
+  const s = corpus.find(x => x.session_key === sessionKey);
+  if (s) s.ingested = true;
+  return resp;
+}
+
+$("#btnNext").addEventListener("click", async () => {
+  const nx = nextSession(); if (!nx || busy) return;
+  busy = true; updateButtons();
+  try { await ingest(nx.session_key); renderCorpus(); await loadGraph(); }
+  catch (e) { flashError("적재 실패: " + e.message); }
+  busy = false; updateButtons();
+});
+
+$("#btnAll").addEventListener("click", async () => {
+  if (busy) return; busy = true; updateButtons();
+  try {
+    let nx;
+    while ((nx = nextSession())) { await ingest(nx.session_key); renderCorpus(); }
+    await loadGraph();
+  } catch (e) { flashError("전체 적재 실패: " + e.message); }
+  busy = false; updateButtons();
+});
+
+$("#btnReset").addEventListener("click", async () => {
+  if (busy) return; busy = true; updateButtons();
+  try {
+    await api("/reset", { method: "POST" });
+    corpus.forEach(s => s.ingested = false);
+    addedSessions = []; renderAdded();
+    $("#pipeline").classList.remove("show");
+    renderCorpus(); await loadGraph();
+    clearDetail(); $("#hits").innerHTML = ""; $("#answer").innerHTML = "";
+  } catch (e) { flashError("리셋 실패: " + e.message); }
+  busy = false; updateButtons();
+});
+
+function flashError(msg) {
+  $("#pipeHead").textContent = msg;
+  $("#pipeline").classList.add("show");
+}
+
+/* ---- add a lecture from pasted text (POST /ingest-text) ------------- */
+function renderAdded() {
+  const wrap = $("#addedWrap"), list = $("#addedList");
+  if (!addedSessions.length) { wrap.style.display = "none"; return; }
+  wrap.style.display = "";
+  list.innerHTML = addedSessions.map(s =>
+    `<div class="sess-item ingested" data-added="${esc(s.session_key)}">
+      <span class="seq">＋</span>
+      <span><span class="t">${esc(s.title || s.session_key)}</span>
+        ${s.chapter ? `<span class="ch">${esc(s.chapter)}</span>` : ""}</span>
+      <span class="state on">추가됨</span>
+    </div>`).join("");
+  list.querySelectorAll("[data-added]").forEach(el =>
+    el.addEventListener("click", () => openSession(el.getAttribute("data-added"))));
+}
+
+function updateTiSubmit() {
+  $("#tiSubmit").disabled = busy || !$("#tiText").value.trim();
+}
+
+async function ingestText() {
+  const msg = $("#tiMsg");
+  const text = $("#tiText").value.trim();
+  if (!text) { msg.className = "err"; msg.textContent = "본문을 입력하세요."; return; }
+  if (busy) return;
+
+  const title = $("#tiTitle").value.trim();
+  const chapter = $("#tiChapter").value.trim();
+  const keywords = $("#tiKeywords").value.split(",").map(s => s.trim()).filter(Boolean);
+  const body = { text };
+  if (title) body.title = title;
+  if (chapter) body.chapter = chapter;
+  if (keywords.length) body.keywords = keywords;
+
+  const btn = $("#tiSubmit"), label = btn.textContent;
+  busy = true; updateButtons();
+  btn.disabled = true; btn.textContent = "추가 중…";
+  msg.className = ""; msg.textContent = "";
+  try {
+    const resp = await api("/ingest-text", { method: "POST", body });
+    const key = resp.session_key || (title || "새 세션");
+    await animatePipeline(key, resp);
+    addedSessions.push({ session_key: resp.session_key, title: title || resp.session_key, chapter });
+    renderAdded();
+    await loadGraph();               // new session node appears + auto-links to shared concepts
+    $("#tiText").value = "";         // clear body; keep title/chapter/keywords
+    msg.className = "ok"; msg.textContent = "그래프에 추가됨 — " + key;
+  } catch (e) {
+    msg.className = "err"; msg.textContent = "추가 실패: " + e.message;
+  } finally {
+    btn.textContent = label;
+    busy = false; updateButtons(); updateTiSubmit();
+  }
+}
+
+$("#tiText").addEventListener("input", updateTiSubmit);
+$("#tiSubmit").addEventListener("click", ingestText);
+$("#tiToggle").addEventListener("click", () => {
+  const card = $("#textCard"), open = card.style.display !== "none";
+  card.style.display = open ? "none" : "";
+  $("#tiToggle").textContent = open ? "펼치기" : "접기";
+  $("#tiToggle").setAttribute("aria-expanded", String(!open));
+});
+
+/* =====================================================================
+   2) FORCE-DIRECTED GRAPH (SVG, O(N^2) repulsion + springs)
+   ===================================================================== */
+const svg = $("#graph");
+const edgeLayer = $("#edgeLayer");
+const nodeLayer = $("#nodeLayer");
+const REL_CLASS = {
+  SESSION_MENTIONS_CONCEPT: "mentions",
+  CONCEPT_CO_OCCURS_WITH: "cooccur",
+  NEXT_SESSION: "next",
+  CONTINUES: "continues",
+  EXPANDS: "expands",
+};
+const SEMANTIC = new Set(["CONTINUES", "EXPANDS"]);
+const DIRECTED = { next: "url(#arrow-next)", continues: "url(#arrow-continues)", expands: "url(#arrow-expands)" };
+
+let gNodes = [], gEdges = [], nodeById = {};
+let W = 800, H = 600, alpha = 0, raf = null;
+const filterState = { mentions: true, cooccur: true, next: true, semantic: true, sessOnly: false };
+let highlightSet = null;   // Set of node ids to spotlight (from search expansion)
+let timelineMode = false;  // "세션↔세션만 보기" = deterministic timeline layout (not force)
+
+function measure() {
+  const wrap = $("#graphWrap");
+  W = Math.max(320, wrap.clientWidth);
+  H = Math.max(320, wrap.clientHeight);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+}
+
+async function loadGraph() {
+  let data;
+  try { data = await api("/graph"); setConn("ok", "연결됨"); }
+  catch (e) {
+    setConn("bad", "백엔드 미연결 (" + e.message + ")");
+    if (!gNodes.length) $("#graphEmpty").style.display = "flex";
+    return;
+  }
+  buildGraph(data);
+}
+
+function edgeGroupEnabled(relType) {
+  const c = REL_CLASS[relType];
+  if (c === "mentions") return filterState.mentions;
+  if (c === "cooccur") return filterState.cooccur;
+  if (c === "next") return filterState.next;
+  if (c === "continues" || c === "expands") return filterState.semantic;
+  return true;
+}
+
+function buildGraph(data) {
+  const prev = {}; gNodes.forEach(n => prev[n.id] = n); // keep positions on reload
+  measure();
+  const cx = W / 2, cy = H / 2;
+
+  const rawNodes = data.nodes || [];
+  const rawEdges = data.edges || [];
+  $("#graphEmpty").style.display = rawNodes.length ? "none" : "flex";
+  $("#legend").style.display = rawNodes.length ? "block" : "none";
+
+  // degree for concept sizing
+  const deg = {};
+  rawEdges.forEach(e => { deg[e.src] = (deg[e.src] || 0) + 1; deg[e.dst] = (deg[e.dst] || 0) + 1; });
+
+  const sessSorted = rawNodes.filter(n => n.type === "session")
+    .sort((a, b) => ((a.meta && a.meta.seq) || 0) - ((b.meta && b.meta.seq) || 0));
+  const sessIndex = {}; sessSorted.forEach((n, i) => sessIndex[n.id] = i);
+  const sN = Math.max(1, sessSorted.length - 1);
+
+  gNodes = rawNodes.map(n => {
+    const p = prev[n.id];
+    let x, y;
+    if (p) { x = p.x; y = p.y; }
+    else if (n.type === "session") {
+      x = W * (0.16 + 0.68 * (sessIndex[n.id] / sN));
+      y = cy + (Math.random() * 60 - 30);
+    } else {
+      x = cx + (Math.random() * 240 - 120);
+      y = cy + (Math.random() * 240 - 120);
+    }
+    const d = deg[n.id] || 0;
+    return {
+      id: n.id, type: n.type, label: n.label || n.id, meta: n.meta || {},
+      x, y, vx: 0, vy: 0, fx: null, fy: null,
+      r: n.type === "session" ? 0 : Math.min(6 + d * 1.0, 14),
+      // sessions are high-degree hubs; a much larger charge makes them repel
+      // each other hard instead of collapsing into one clump at the centre.
+      charge: n.type === "session" ? 7 : 1,
+      active: true,
+    };
+  });
+  nodeById = {}; gNodes.forEach(n => nodeById[n.id] = n);
+
+  gEdges = rawEdges.filter(e => nodeById[e.src] && nodeById[e.dst]).map(e => ({
+    src: e.src, dst: e.dst, rel: e.rel_type, cls: REL_CLASS[e.rel_type] || "mentions",
+    concept_id: e.concept_id, concept_label: e.concept_label, weight: e.weight || 1,
+    directed: !!DIRECTED[REL_CLASS[e.rel_type]],
+  }));
+
+  renderNodesDOM();
+  applyFilters();                // builds edges + starts sim (force) OR timeline layout
+  if (!timelineMode) warmup(90);  // pre-settle so the first paint isn't a hairball
+}
+
+function nodeMarkup(n, i) {
+  if (n.type === "session") {
+    const w = 26, h = 22;
+    // seq number inside the rect, full title beneath — avoids the "label drawn
+    // twice" look that a short-vs-long duplicate produced for short titles.
+    const seq = (n.meta && n.meta.seq != null && n.meta.seq !== "") ? n.meta.seq : shortLabel(n.label, 4);
+    return `<g class="node node-session" data-n="${i}">
+      <rect x="${-w/2}" y="${-h/2}" width="${w}" height="${h}" rx="7"></rect>
+      <text text-anchor="middle" y="4">${esc(String(seq))}</text>
+      <text class="cap" text-anchor="middle" y="${h/2 + 13}" style="fill:var(--sub);stroke-width:2.5px;font-weight:400">${esc(shortLabel(n.label, 20))}</text>
+    </g>`;
+  }
+  const stop = n.meta && n.meta.stoplist ? " stop" : "";
+  return `<g class="node node-concept${stop}" data-n="${i}">
+    <circle r="${n.r}"></circle>
+    <text text-anchor="middle" y="${n.r + 12}">${esc(shortLabel(n.label, 14))}</text>
+  </g>`;
+}
+
+// concepts first, sessions last → sessions always paint on top of concepts
+function renderNodesDOM() {
+  const order = gNodes.map((n, i) => ({ n, i }))
+    .sort((a, b) => (a.n.type === "session" ? 1 : 0) - (b.n.type === "session" ? 1 : 0));
+  nodeLayer.innerHTML = order.map(({ n, i }) => nodeMarkup(n, i)).join("");
+  nodeLayer.querySelectorAll(".node").forEach(el => {
+    const i = +el.getAttribute("data-n"), n = gNodes[i];
+    n.el = el;
+    el.addEventListener("pointerdown", ev => startDrag(ev, n));
+    el.addEventListener("pointerenter", ev => showTip(ev, n));
+    el.addEventListener("pointermove", ev => moveTip(ev));
+    el.addEventListener("pointerleave", hideTip);
+    el.addEventListener("click", () => {
+      if (n._dragged) { n._dragged = false; return; }
+      selectNode(n);
+      if (n.type === "concept") openConcept(n.id); else openSession(n.id);
+    });
+  });
+}
+
+// force-mode edges = straight lines (rebuilt when re-entering force mode)
+function renderEdges() {
+  edgeLayer.innerHTML = gEdges.map((e, i) => {
+    const marker = e.directed ? ` marker-end="${DIRECTED[e.cls]}"` : "";
+    return `<line class="edge ${e.cls}" data-e="${i}"${marker}></line>`;
+  }).join("");
+  gEdges.forEach((e, i) => {
+    e.el = edgeLayer.children[i]; e.labelEl = null;
+    e.el.style.display = e.visible ? "" : "none";
+  });
+}
+
+function shortLabel(s, n) {
+  s = String(s || "");
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+/* ---- filters ------------------------------------------------------- */
+function applyFilters() {
+  const sessOnly = filterState.sessOnly;
+  timelineMode = sessOnly;
+  // node active: sessions always; concepts only if not sessOnly
+  gNodes.forEach(n => { n.active = n.type === "session" ? true : !sessOnly; });
+  gEdges.forEach(e => {
+    const a = nodeById[e.src], b = nodeById[e.dst];
+    // concepts are inactive under sessOnly, so any edge touching one auto-hides here
+    e.visible = edgeGroupEnabled(e.rel) && a.active && b.active;
+  });
+  gNodes.forEach(n => { n.el.style.display = n.active ? "" : "none"; });
+
+  if (sessOnly) {
+    stopSim();
+    layoutTimeline();            // deterministic seq-ordered timeline + arc edges
+  } else {
+    gNodes.forEach(n => { if (n.type === "session") { n.fx = null; n.fy = null; } });
+    renderEdges();               // back to straight-line force edges
+    applyHighlight();
+    reheat(0.7);
+  }
+}
+
+function stopSim() { if (raf) { cancelAnimationFrame(raf); raf = null; } alpha = 0; }
+
+/* ---- deterministic TIMELINE layout ("세션↔세션만 보기") -------------
+   Sessions are laid out left→right by seq on a fixed horizontal baseline.
+   NEXT_SESSION rides the baseline; CONTINUES arcs above / EXPANDS arcs below,
+   each labelled with the concept that carries across the two lectures. */
+function layoutTimeline() {
+  const sess = gNodes.filter(n => n.type === "session")
+    .sort((a, b) => ((a.meta && a.meta.seq) || 0) - ((b.meta && b.meta.seq) || 0));
+  const baseY = H / 2;
+  const padX = Math.max(72, W * 0.11);
+  const span = Math.max(1, W - 2 * padX);
+  const cnt = sess.length;
+  const pos = {};
+  sess.forEach((s, i) => {
+    s.x = cnt <= 1 ? W / 2 : padX + span * (i / (cnt - 1));
+    s.y = baseY; s.fx = s.x; s.fy = s.y;
+    s.el.setAttribute("transform", `translate(${s.x.toFixed(1)},${s.y.toFixed(1)})`);
+    pos[s.id] = s;
+  });
+
+  const halfW = 17, halfH = 14;
+  const stagger = { CONTINUES: 0, EXPANDS: 0 };
+  let html = "";
+  gEdges.forEach((e, i) => {
+    if (!e.visible || !pos[e.src] || !pos[e.dst]) return;
+    const a = pos[e.src], b = pos[e.dst];
+    if (e.rel === "NEXT_SESSION") {
+      const lo = Math.min(a.x, b.x) + halfW + 2, hi = Math.max(a.x, b.x) - halfW - 2;
+      html += `<g class="tl-edge" data-e="${i}"><line class="edge next" marker-end="${DIRECTED.next}" `
+        + `x1="${lo.toFixed(1)}" y1="${baseY}" x2="${hi.toFixed(1)}" y2="${baseY}"></line></g>`;
+      return;
+    }
+    const above = e.rel === "CONTINUES", dir = above ? -1 : 1;
+    const stag = (stagger[e.rel]++ % 3) * 24;             // fan overlapping arcs apart
+    const spanX = Math.abs(b.x - a.x);
+    const hgt = Math.min(H * 0.4, 44 + spanX * 0.34 + stag);
+    const y0 = baseY + dir * halfH;                        // emerge from node top/bottom edge
+    const ctrlY = baseY + dir * (halfH + hgt);
+    const mx = (a.x + b.x) / 2;
+    const apexY = (y0 + ctrlY) / 2;                        // quadratic apex at t=0.5
+    const cls = REL_CLASS[e.rel];
+    const lab = e.concept_label
+      ? `<text class="tl-lab" x="${mx.toFixed(1)}" y="${(apexY + (above ? -5 : 13)).toFixed(1)}" text-anchor="middle">${esc(e.concept_label)}</text>`
+      : "";
+    html += `<g class="tl-edge" data-e="${i}"><path class="edge ${cls}" `
+      + `d="M ${a.x.toFixed(1)} ${y0.toFixed(1)} Q ${mx.toFixed(1)} ${ctrlY.toFixed(1)} ${b.x.toFixed(1)} ${y0.toFixed(1)}" `
+      + `marker-end="${DIRECTED[cls]}"></path>${lab}</g>`;
+  });
+  edgeLayer.innerHTML = html;
+  gEdges.forEach(e => { e.el = null; e.labelEl = null; });
+  edgeLayer.querySelectorAll(".tl-edge").forEach(g => {
+    const i = +g.getAttribute("data-e");
+    gEdges[i].el = g; gEdges[i].labelEl = g.querySelector(".tl-lab");
+  });
+  applyHighlight();
+}
+
+$$("#filters input[data-f]").forEach(inp =>
+  inp.addEventListener("change", () => {
+    filterState[inp.getAttribute("data-f")] = inp.checked;
+    applyFilters();
+  }));
+$("#sessOnly").addEventListener("change", e => {
+  filterState.sessOnly = e.target.checked;
+  $$('#filters label').forEach(l => {
+    const box = l.querySelector('input[data-f]');
+    if (box && (box.getAttribute("data-f") === "mentions" || box.getAttribute("data-f") === "cooccur"))
+      l.classList.toggle("disabled", e.target.checked);
+  });
+  applyFilters();
+});
+
+/* ---- highlight (search expansion) --------------------------------- */
+function applyHighlight() {
+  const hs = highlightSet;
+  gNodes.forEach(n => {
+    if (!n.active) return;
+    n.el.classList.toggle("dim", !!hs && !hs.has(n.id));
+  });
+  gEdges.forEach(e => {
+    if (!e.el) return;   // edge not currently drawn (filtered out / hidden in timeline)
+    const on = !hs || (hs.has(e.src) && hs.has(e.dst));
+    e.el.classList.toggle("dim", !on);
+  });
+  $("#btnClearHl").style.display = hs ? "" : "none";
+}
+function setHighlight(ids) { highlightSet = ids && ids.size ? ids : null; applyHighlight(); }
+$("#btnClearHl").addEventListener("click", () => setHighlight(null));
+
+function selectNode(n) {
+  gNodes.forEach(x => x.el && x.el.classList.toggle("sel", x === n));
+}
+
+/* ---- simulation ---------------------------------------------------- */
+function reheat(a) {
+  if (timelineMode) return;   // timeline layout is static — never run the force sim
+  alpha = Math.max(alpha, a);
+  if (!raf) raf = requestAnimationFrame(tick);
+}
+
+// synchronous pre-settle so buildGraph's first painted frame is already spread out
+function warmup(steps) {
+  alpha = 0.9;
+  for (let k = 0; k < steps; k++) step();
+  render();
+  reheat(0.5);
+}
+
+function tick() {
+  step();
+  render();
+  alpha *= 0.988;   // slower cooling = more iterations before it stabilises
+  if (alpha > 0.02) raf = requestAnimationFrame(tick);
+  else { raf = null; render(); }
+}
+
+function step() {
+  const act = gNodes.filter(n => n.active);
+  const cx = W / 2, cy = H / 2;
+  const REP = 1000, GRAV = 0.012, DAMP = 0.87;
+  // repulsion O(N^2) — scaled by node charge so session×session repels hardest
+  for (let i = 0; i < act.length; i++) {
+    const a = act[i];
+    for (let j = i + 1; j < act.length; j++) {
+      const b = act[j];
+      let dx = a.x - b.x, dy = a.y - b.y;
+      let d2 = dx * dx + dy * dy;
+      if (d2 < 0.01) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 1; }
+      const d = Math.sqrt(d2);
+      const f = Math.min(REP * a.charge * b.charge / d2, 55);
+      const ux = dx / d, uy = dy / d;
+      a.vx += ux * f * 0.5; a.vy += uy * f * 0.5;
+      b.vx -= ux * f * 0.5; b.vy -= uy * f * 0.5;
+    }
+  }
+  // springs (only visible edges between active nodes)
+  for (const e of gEdges) {
+    if (!e.visible) continue;
+    const a = nodeById[e.src], b = nodeById[e.dst];
+    if (!a.active || !b.active) continue;
+    let dx = b.x - a.x, dy = b.y - a.y;
+    let d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+    // longer ideal lengths spread the graph wider across the canvas
+    const L = e.cls === "cooccur" ? 175 : (e.cls === "mentions" ? 115 : 205);
+    const k = (SEMANTIC.has(e.rel) || e.cls === "next") ? 0.02 : 0.032;
+    const f = k * (d - L);
+    const ux = dx / d, uy = dy / d;
+    a.vx += ux * f; a.vy += uy * f;
+    b.vx -= ux * f; b.vy -= uy * f;
+  }
+  // gravity + integrate
+  const pad = 26;
+  for (const n of act) {
+    if (n.fx != null) { n.x = n.fx; n.y = n.fy; n.vx = 0; n.vy = 0; continue; }
+    n.vx += (cx - n.x) * GRAV;
+    n.vy += (cy - n.y) * GRAV;
+    n.vx *= DAMP; n.vy *= DAMP;
+    n.x += n.vx * alpha; n.y += n.vy * alpha;
+    n.x = Math.max(pad, Math.min(W - pad, n.x));
+    n.y = Math.max(pad, Math.min(H - pad, n.y));
+  }
+}
+
+function render() {
+  for (const n of gNodes) {
+    if (!n.active || !n.el) continue;
+    n.el.setAttribute("transform", `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`);
+  }
+  for (const e of gEdges) {
+    if (!e.visible || !e.el) continue;
+    const a = nodeById[e.src], b = nodeById[e.dst];
+    // shorten toward target so arrowhead sits on the node edge
+    let dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+    const rb = b.type === "session" ? 18 : b.r + 3;
+    const ra = a.type === "session" ? 18 : a.r + 3;
+    const x1 = a.x + dx / d * ra, y1 = a.y + dy / d * ra;
+    const x2 = b.x - dx / d * rb, y2 = b.y - dy / d * rb;
+    e.el.setAttribute("x1", x1.toFixed(1)); e.el.setAttribute("y1", y1.toFixed(1));
+    e.el.setAttribute("x2", x2.toFixed(1)); e.el.setAttribute("y2", y2.toFixed(1));
+  }
+}
+
+/* ---- drag ---------------------------------------------------------- */
+let dragNode = null;
+function svgPoint(evt) {
+  const pt = svg.createSVGPoint();
+  pt.x = evt.clientX; pt.y = evt.clientY;
+  const m = svg.getScreenCTM();
+  return m ? pt.matrixTransform(m.inverse()) : { x: evt.clientX, y: evt.clientY };
+}
+function startDrag(ev, n) {
+  if (timelineMode) return;   // timeline nodes are pinned by seq — no dragging
+  ev.preventDefault();
+  dragNode = n; n._dragged = false;
+  const p = svgPoint(ev);
+  n.fx = p.x; n.fy = p.y;
+  window.addEventListener("pointermove", onDrag);
+  window.addEventListener("pointerup", endDrag);
+}
+function onDrag(ev) {
+  if (!dragNode) return;
+  dragNode._dragged = true;
+  const p = svgPoint(ev);
+  dragNode.fx = p.x; dragNode.fy = p.y;
+  reheat(0.4);
+}
+function endDrag() {
+  if (dragNode) { dragNode.fx = null; dragNode.fy = null; }
+  dragNode = null;
+  window.removeEventListener("pointermove", onDrag);
+  window.removeEventListener("pointerup", endDrag);
+  reheat(0.3);
+}
+
+$("#btnReflow").addEventListener("click", () => {
+  if (timelineMode) { measure(); layoutTimeline(); return; }
+  gNodes.forEach(n => { if (n.fx == null) { n.vx += Math.random() * 40 - 20; n.vy += Math.random() * 40 - 20; } });
+  reheat(0.9);
+});
+
+/* ---- tooltip ------------------------------------------------------- */
+const tip = $("#tip");
+function showTip(ev, n) {
+  const m = n.meta || {};
+  const extra = n.type === "session"
+    ? [m.seq != null ? "seq " + m.seq : "", m.chapter || ""].filter(Boolean).join(" · ")
+    : (m.stoplist ? "불용 개념" : "개념");
+  tip.innerHTML = `<div class="ty">${n.type === "session" ? "세션" : "개념"}</div>${esc(n.label)}${
+    extra ? `<div style="color:var(--sub);font-size:10.5px;margin-top:2px">${esc(extra)}</div>` : ""}`;
+  tip.classList.add("on"); moveTip(ev);
+}
+function moveTip(ev) {
+  tip.style.left = (ev.clientX + 14) + "px";
+  tip.style.top = (ev.clientY + 14) + "px";
+}
+function hideTip() { tip.classList.remove("on"); }
+
+/* =====================================================================
+   3) DETAIL PANEL — concept evidence / session detail
+   ===================================================================== */
+function clearDetail() {
+  $("#detail").innerHTML =
+    '<div class="empty">그래프에서 <b>개념</b> 노드를 누르면 근거 세그먼트가, <b>세션</b> 노드를 누르면 강의 상세가 여기에 표시됩니다.</div>';
+}
+
+function markText(text, start, end, matched) {
+  text = String(text || "");
+  if (typeof start === "number" && typeof end === "number" &&
+      start >= 0 && end <= text.length && end > start) {
+    return esc(text.slice(0, start)) + "<mark>" + esc(text.slice(start, end)) + "</mark>" + esc(text.slice(end));
+  }
+  if (matched) {
+    const i = text.indexOf(matched);
+    if (i >= 0) return esc(text.slice(0, i)) + "<mark>" + esc(matched) + "</mark>" + esc(text.slice(i + matched.length));
+  }
+  return esc(text);
+}
+
+async function openConcept(id) {
+  const box = $("#detail");
+  box.innerHTML = '<div class="empty">근거를 불러오는 중…</div>';
+  try {
+    const d = await api("/concept/" + encodeURIComponent(id));
+    const sess = (d.sessions || []).map(s =>
+      `<span class="chip sess" data-open-sess="${esc(s.session_id)}">${esc(s.title || s.session_id)}</span>`).join("");
+    const ev = (d.evidence || []).map(e => `
+      <div class="ev">
+        <div class="m"><b>${esc(e.session_id)}</b> · 세그먼트 #${esc(e.seg_no)}</div>
+        <div class="txt">${markText(e.text, e.char_start, e.char_end, e.matched_text)}</div>
+      </div>`).join("") || '<div class="empty">근거 세그먼트가 없습니다.</div>';
+    box.innerHTML = `
+      <div class="kicker">개념</div>
+      <h3 class="serif">${esc(d.label || id)}</h3>
+      <div class="subhd">출현 세션 (${(d.sessions || []).length})</div>
+      <div>${sess || '<span class="empty">–</span>'}</div>
+      <div class="subhd">근거 (evidence · ${(d.evidence || []).length})</div>
+      ${ev}`;
+    wireChips(box);
+  } catch (e) {
+    box.innerHTML = `<div class="empty">개념을 불러올 수 없습니다: ${esc(e.message)}</div>`;
+  }
+}
+
+async function openSession(id) {
+  const box = $("#detail");
+  box.innerHTML = '<div class="empty">강의 상세를 불러오는 중…</div>';
+  try {
+    const d = await api("/session/" + encodeURIComponent(id));
+    const concepts = (d.concepts || []).map(c =>
+      `<span class="chip" data-open-conc="${esc(c.concept_id)}">${esc(c.label)}</span>`).join("");
+    const segs = (d.segments || []).map(s => `
+      <div class="seg"><span class="sp">${esc(s.speaker || "")}</span>${esc(s.text)}</div>`).join("")
+      || '<div class="empty">세그먼트가 없습니다.</div>';
+    box.innerHTML = `
+      <div class="kicker">세션 · seq ${esc(d.seq)}</div>
+      <h3 class="serif">${esc(d.title || id)}</h3>
+      <div class="meta">${esc(d.chapter || "")}</div>
+      ${d.summary ? `<div class="summary">${esc(d.summary)}</div>` : ""}
+      <div class="subhd">개념 (${(d.concepts || []).length})</div>
+      <div>${concepts || '<span class="empty">–</span>'}</div>
+      <div class="subhd">원문 세그먼트 (${(d.segments || []).length})</div>
+      ${segs}`;
+    wireChips(box);
+  } catch (e) {
+    box.innerHTML = `<div class="empty">세션을 불러올 수 없습니다: ${esc(e.message)}</div>`;
+  }
+}
+
+function wireChips(scope) {
+  scope.querySelectorAll("[data-open-conc]").forEach(el =>
+    el.addEventListener("click", () => openConcept(el.getAttribute("data-open-conc"))));
+  scope.querySelectorAll("[data-open-sess]").forEach(el =>
+    el.addEventListener("click", () => openSession(el.getAttribute("data-open-sess"))));
+}
+
+/* =====================================================================
+   4) SEARCH — hits + expansion subgraph highlight
+   ===================================================================== */
+function renderHits(hits) {
+  const box = $("#hits");
+  box.innerHTML = hits.length ? hits.map(h => `
+    <div class="hit" data-open-sess="${esc(h.session_id)}">
+      <div class="m"><b>${esc(h.session_id)}</b> · #${esc(h.seg_no)}
+        · <span style="color:var(--faint)">score ${typeof h.score === "number" ? h.score.toFixed(3) : esc(h.score)}</span>
+        ${(h.concepts || []).map(c => `<span class="chip">${esc(c)}</span>`).join("")}</div>
+      <div class="x">${esc(h.text)}</div>
+    </div>`).join("") : '<div class="empty">결과 없음</div>';
+  wireChips(box);
+}
+
+// spotlight the search/ask expansion subgraph (related sessions+concepts) on the canvas
+function highlightFrom(hits, expansion) {
+  const exp = expansion || {};
+  const ids = new Set((exp.nodes || []).map(n => n.id));
+  (hits || []).forEach(h => { if (h.session_id) ids.add(h.session_id); });
+  (exp.edges || []).forEach(e => { ids.add(e.src); ids.add(e.dst); });
+  setHighlight(ids);
+}
+
+async function doSearch() {
+  const q = $("#q").value.trim();
+  if (!q) return;
+  $("#answer").innerHTML = "";          // basic search: clear any prior AI answer
+  const box = $("#hits");
+  box.innerHTML = '<div class="empty">검색 중…</div>';
+  try {
+    const d = await api("/search?q=" + encodeURIComponent(q) + "&k=8");
+    renderHits(d.hits || []);
+    highlightFrom(d.hits, d.expansion);
+  } catch (e) {
+    box.innerHTML = `<div class="empty">검색 오류: ${esc(e.message)}</div>`;
+  }
+}
+$("#btnSearch").addEventListener("click", doSearch);
+$("#q").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  if ((e.ctrlKey || e.metaKey) && ragConfig.rag_enabled) doAsk();  // Ctrl/⌘+Enter = AI 답변
+  else doSearch();
+});
+
+/* ---- RAG Q&A (/ask, /config) --------------------------------------- */
+let ragConfig = { rag_enabled: false, chat_model: null, embed_model: null };
+
+async function loadConfig() {
+  try {
+    const c = await api("/config");
+    ragConfig = {
+      rag_enabled: !!c.rag_enabled,
+      chat_model: c.chat_model || null,
+      embed_model: c.embed_model || null,
+    };
+  } catch (e) {
+    ragConfig = { rag_enabled: false, chat_model: null, embed_model: null };
+  }
+  applyRagConfig();
+}
+
+function applyRagConfig() {
+  const btn = $("#btnAsk"), info = $("#ragInfo");
+  btn.disabled = !ragConfig.rag_enabled;
+  if (ragConfig.rag_enabled) {
+    btn.title = "질문에 근거 기반으로 답합니다 (Ctrl+Enter)";
+    const models = [ragConfig.chat_model, ragConfig.embed_model].filter(Boolean).join(" · ");
+    info.textContent = models ? "RAG: " + models : "RAG 활성";
+    info.className = "rag-info on";
+  } else {
+    btn.title = "OPENAI_API_KEY 필요 — RAG 비활성";
+    info.textContent = "RAG 비활성 — OPENAI_API_KEY 필요";
+    info.className = "rag-info off";
+  }
+}
+
+// escape, then apply **bold** and [citation] markup; newlines kept via pre-wrap
+function formatAnswer(text) {
+  let s = esc(text || "");
+  s = s.replace(/\*\*([^*\n]+?)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/\[([^\]\n]+?)\]/g, '<span class="cite">[$1]</span>');
+  return s;
+}
+
+function renderAnswer(d) {
+  const srcIds = [...new Set((d.hits || []).map(h => h.session_id).filter(Boolean))];
+  const sources = srcIds.map(id =>
+    `<span class="chip sess" data-open-sess="${esc(id)}">${esc(id)}</span>`).join("");
+  $("#answer").innerHTML = `
+    <div class="card answer-card">
+      <div class="ans-hd"><span class="dotm"></span>AI 답변${ragConfig.chat_model ? " · " + esc(ragConfig.chat_model) : ""}</div>
+      <div class="ans-body">${formatAnswer(d.answer)}</div>
+      ${sources ? `<div class="ans-src"><span class="ans-src-lbl">출처</span>${sources}</div>` : ""}
+    </div>`;
+  wireChips($("#answer"));
+}
+
+async function doAsk() {
+  if (!ragConfig.rag_enabled) return;
+  const q = $("#q").value.trim();
+  if (!q) {
+    $("#answer").innerHTML = '<div class="card answer-card"><div class="empty">질문을 입력하세요.</div></div>';
+    return;
+  }
+  const btn = $("#btnAsk");
+  const modelTxt = ragConfig.chat_model ? " (" + ragConfig.chat_model + ")" : "";
+  btn.disabled = true;
+  btn.textContent = "답변 생성 중…" + modelTxt;
+  $("#answer").innerHTML =
+    `<div class="card answer-card"><div class="ans-loading"><span class="spin"></span>`
+    + `답변 생성 중…${esc(modelTxt)} <small>(LLM 호출 · 3~8초)</small></div></div>`;
+  try {
+    const d = await api("/ask?q=" + encodeURIComponent(q) + "&k=6");
+    renderAnswer(d);
+    renderHits(d.hits || []);
+    highlightFrom(d.hits, d.expansion);
+  } catch (e) {
+    $("#answer").innerHTML = `<div class="card answer-card"><div class="ans-err">답변 생성 실패: ${esc(e.message)}</div></div>`;
+  } finally {
+    btn.textContent = "AI 답변";
+    btn.disabled = !ragConfig.rag_enabled;
+  }
+}
+$("#btnAsk").addEventListener("click", doAsk);
+
+/* =====================================================================
+   INIT
+   ===================================================================== */
+let resizeT = null;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeT);
+  resizeT = setTimeout(() => { measure(); if (timelineMode) layoutTimeline(); else reheat(0.4); }, 150);
+});
+
+(async function init() {
+  measure();
+  loadConfig();               // RAG capability probe (independent, non-blocking)
+  await loadCorpus();
+  await loadGraph();
+})();
+</script>
+</body>
+</html>

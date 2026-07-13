@@ -1,0 +1,26 @@
+# secrets — 절대 커밋 금지 (ClickUp 토큰 등)
+.env
+.env.*
+*.key
+
+# python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# generated data / runtime
+*.db
+nohup.out
+
+# node
+node_modules/
+
+# source binaries (팀 자산, 코드 아님)
+*.pptx
+
+# os
+.DS_Store
+
+# 배포용 시드 DB는 커밋 (샘플+캐시)
+!deploy/seed.db

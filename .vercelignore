@@ -1,0 +1,13 @@
+.venv
+.git
+__pycache__
+tests
+scripts
+requirements-dev.txt
+*.pptx
+/synapvox_graph.db
+/synapvox.db
+app
+main.py
+fixtures
+static/index.html

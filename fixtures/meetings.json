@@ -1,0 +1,154 @@
+[
+  {
+    "meeting_id": "M01",
+    "project_id": "P-DEMO",
+    "date": "2026-06-15",
+    "mode": "meeting",
+    "source": "fixture_M01_kickoff.m4a",
+    "doc_refs": [{"name": "킥오프 자료.pptx", "source_type": "pptx", "storage_key": null}],
+    "summary": "사내 결제 서비스 킥오프. 3분기 내 사내 스토어 자체 결제 오픈 목표. 범위는 카드+간편결제(해외 결제 제외), PG사 후보는 토스페이먼츠·KG이니시스 2곳, 일정은 6월 설계·7월 구현·8월 QA.",
+    "segments": [
+      {"id": 1, "speaker": "A", "ts_start": 12.0, "ts_end": 41.5, "text": "킥오프 시작하겠습니다. 3분기 안에 사내 스토어에 자체 결제 기능을 붙이는 게 이번 프로젝트 목표입니다.", "topics": ["일정"]},
+      {"id": 2, "speaker": "B", "ts_start": 44.0, "ts_end": 79.2, "text": "프로젝트 범위를 명확히 하죠. 이번 분기는 카드 결제와 간편결제까지만 하고 해외 결제는 범위에서 제외합시다.", "topics": ["결제 모듈"]},
+      {"id": 3, "speaker": "C", "ts_start": 82.0, "ts_end": 128.4, "text": "PG사 후보는 토스페이먼츠와 KG이니시스 두 곳으로 좁혔습니다. 다음 주까지 수수료와 정산 주기를 비교해 오겠습니다.", "topics": ["PG사 선정"]},
+      {"id": 4, "speaker": "D", "ts_start": 131.0, "ts_end": 170.8, "text": "일정은 6월 설계, 7월 구현, 8월 QA로 잡겠습니다. 8월 말 오픈이 마지노선입니다.", "topics": ["일정"]},
+      {"id": 5, "speaker": "A", "ts_start": 174.0, "ts_end": 215.0, "text": "결제 모듈은 외부 SDK 의존을 최소화하고 우리 쪽에 추상화 레이어를 하나 두는 방향으로 갑시다.", "topics": ["결제 모듈"]}
+    ],
+    "bookmarks": [
+      {"segment_id": 2, "type": "decision", "label": "범위: 카드+간편결제, 해외 결제 제외"},
+      {"segment_id": 3, "type": "action", "label": "PG사 2곳 수수료·정산 주기 비교"}
+    ],
+    "decisions": [
+      {"statement": "이번 분기 범위는 카드+간편결제로 하고 해외 결제는 제외한다.", "supersedes_hint": null, "segment_id": 2}
+    ],
+    "action_items": [
+      {"task": "토스페이먼츠·KG이니시스 수수료 및 정산 주기 비교 조사", "assignee": "C", "due": "2026-06-22", "segment_id": 3}
+    ]
+  },
+  {
+    "meeting_id": "M02",
+    "project_id": "P-DEMO",
+    "date": "2026-06-22",
+    "mode": "meeting",
+    "source": "fixture_M02_pg.m4a",
+    "doc_refs": [{"name": "PG사 비교표.pptx", "source_type": "pptx", "storage_key": null}],
+    "summary": "PG사 비교 결과 검토 후 토스페이먼츠로 확정. 수수료 2.9%·정산 D+2가 근거. 결제 모듈 추상화 레이어는 결제 요청·승인·취소 3개 인터페이스로 합의, 웹훅 재시도 설계는 다음 회의로.",
+    "segments": [
+      {"id": 1, "speaker": "C", "ts_start": 8.0, "ts_end": 52.3, "text": "비교 결과입니다. 토스페이먼츠는 수수료 2.9%에 정산 D+2, KG이니시스는 3.1%에 D+5입니다.", "topics": ["PG사 선정", "수수료"]},
+      {"id": 2, "speaker": "B", "ts_start": 55.0, "ts_end": 94.0, "text": "수수료 차이가 연간 볼륨으로 계산하면 꽤 큽니다. 초기 볼륨 기준으로는 토스페이먼츠 쪽이 유리해 보입니다.", "topics": ["수수료"]},
+      {"id": 3, "speaker": "A", "ts_start": 97.0, "ts_end": 133.6, "text": "그럼 PG사는 토스페이먼츠로 확정하죠. 계약 검토는 이번 주에 바로 시작하겠습니다.", "topics": ["PG사 선정"]},
+      {"id": 4, "speaker": "D", "ts_start": 137.0, "ts_end": 182.0, "text": "결제 모듈 추상화 레이어 초안을 봤는데, 결제 요청·승인·취소 세 개 인터페이스로 가는 게 깔끔합니다.", "topics": ["결제 모듈"]},
+      {"id": 5, "speaker": "C", "ts_start": 185.0, "ts_end": 231.9, "text": "웹훅으로 승인 결과를 받는 구조면 재시도 처리가 필요합니다. 다음 설계 회의에서 다루겠습니다.", "topics": ["결제 모듈"]}
+    ],
+    "bookmarks": [
+      {"segment_id": 3, "type": "decision", "label": "PG사 토스페이먼츠 확정"},
+      {"segment_id": 5, "type": "topic_shift", "label": "웹훅 재시도 설계는 다음 회의로"}
+    ],
+    "decisions": [
+      {"statement": "PG사는 토스페이먼츠로 확정한다.", "supersedes_hint": null, "segment_id": 3}
+    ],
+    "action_items": [
+      {"task": "토스페이먼츠 계약 조건 검토 시작", "assignee": "A", "due": "2026-06-26", "segment_id": 3}
+    ]
+  },
+  {
+    "meeting_id": "M03",
+    "project_id": "P-DEMO",
+    "date": "2026-06-29",
+    "mode": "meeting",
+    "source": "fixture_M03_design.m4a",
+    "doc_refs": [{"name": "결제 모듈 API 설계안.pptx", "source_type": "pptx", "storage_key": null}],
+    "summary": "결제 모듈 API 4개 엔드포인트(생성·승인 콜백·취소·환불) 확정. 웹훅은 멱등키+지수 백오프 재시도. 정산 배치는 매일 새벽 2시 대사, 수수료 검증 리포트 포함. 카드 정보 미저장·PG 토큰만 보관 결정.",
+    "segments": [
+      {"id": 1, "speaker": "D", "ts_start": 10.0, "ts_end": 55.0, "text": "결제 모듈 API 설계안입니다. 결제 생성, 승인 콜백, 취소, 환불 네 개 엔드포인트로 정리했습니다.", "topics": ["결제 모듈"]},
+      {"id": 2, "speaker": "C", "ts_start": 58.0, "ts_end": 104.7, "text": "웹훅 처리는 멱등키를 붙여서 중복 승인을 막고, 실패하면 지수 백오프로 재시도하는 구조입니다.", "topics": ["결제 모듈"]},
+      {"id": 3, "speaker": "B", "ts_start": 108.0, "ts_end": 149.0, "text": "정산 배치는 매일 새벽 2시에 돌려서 PG 정산 파일과 우리 원장을 대사하는 걸로 하죠.", "topics": ["정산 배치"]},
+      {"id": 4, "speaker": "A", "ts_start": 152.0, "ts_end": 190.2, "text": "정산 대사할 때 수수료 계산이 계약 조건과 맞는지 검증하는 리포트도 배치에 포함합시다.", "topics": ["정산 배치", "수수료"]},
+      {"id": 5, "speaker": "B", "ts_start": 193.0, "ts_end": 238.0, "text": "환불 처리는 부분 환불까지 지원해야 합니다. 원장에 환불 이력 테이블을 따로 둡시다.", "topics": ["결제 모듈"]},
+      {"id": 6, "speaker": "D", "ts_start": 241.0, "ts_end": 289.5, "text": "카드 정보는 우리 서버에 저장하지 않고 PG 토큰만 보관합니다. 보안 점검 때 이 부분 확인받겠습니다.", "topics": ["보안"]}
+    ],
+    "bookmarks": [
+      {"segment_id": 2, "type": "decision", "label": "웹훅 멱등키+지수 백오프"},
+      {"segment_id": 6, "type": "decision", "label": "카드 정보 미저장, PG 토큰만 보관"}
+    ],
+    "decisions": [
+      {"statement": "카드 정보는 저장하지 않고 PG 토큰만 보관한다.", "supersedes_hint": null, "segment_id": 6}
+    ],
+    "action_items": [
+      {"task": "정산 배치 스켈레톤 구현", "assignee": "B", "due": "2026-07-06", "segment_id": 3}
+    ]
+  },
+  {
+    "meeting_id": "M04",
+    "project_id": "P-DEMO",
+    "date": "2026-07-06",
+    "mode": "meeting",
+    "source": "fixture_M04_security.m4a",
+    "doc_refs": [{"name": "보안 점검 결과.pdf", "source_type": "pdf", "storage_key": null}],
+    "summary": "보안 점검에서 웹훅 서명 검증 누락 지적. 토스페이먼츠 수수료 조건 변경(3.3%)으로 PG사를 KG이니시스로 번복 결정. PG 변경 여파로 오픈 일정을 9월 중순으로 2주 조정.",
+    "segments": [
+      {"id": 1, "speaker": "A", "ts_start": 9.0, "ts_end": 54.1, "text": "보안팀 점검 결과를 공유합니다. 웹훅 엔드포인트에 서명 검증이 빠져 있다는 지적이 나왔습니다.", "topics": ["보안"]},
+      {"id": 2, "speaker": "C", "ts_start": 57.0, "ts_end": 109.8, "text": "토스페이먼츠 계약 조건이 바뀌었습니다. 우리 볼륨 구간에서는 수수료가 3.3%로 올라서 재검토가 필요합니다.", "topics": ["PG사 선정"]},
+      {"id": 3, "speaker": "A", "ts_start": 113.0, "ts_end": 152.0, "text": "그럼 PG사를 KG이니시스로 변경합니다. 지난번 토스페이먼츠 확정 결정은 번복하는 걸로 하죠.", "topics": ["PG사 선정"]},
+      {"id": 4, "speaker": "D", "ts_start": 155.0, "ts_end": 199.3, "text": "PG사 변경으로 연동 일정이 2주 밀립니다. 오픈은 9월 중순으로 조정하겠습니다.", "topics": ["일정", "오픈 준비"]},
+      {"id": 5, "speaker": "B", "ts_start": 202.0, "ts_end": 240.0, "text": "보안 지적사항은 이번 주 안에 웹훅 서명 검증을 붙여서 해소하겠습니다.", "topics": ["보안"]}
+    ],
+    "bookmarks": [
+      {"segment_id": 1, "type": "conflict", "label": "보안 점검: 웹훅 서명 검증 누락"},
+      {"segment_id": 3, "type": "decision", "label": "PG사 KG이니시스로 번복"}
+    ],
+    "decisions": [
+      {"statement": "PG사를 KG이니시스로 변경한다.", "supersedes_hint": "M02의 '토스페이먼츠 확정' 결정을 번복", "segment_id": 3}
+    ],
+    "action_items": [
+      {"task": "웹훅 서명 검증 구현", "assignee": "B", "due": "2026-07-10", "segment_id": 5},
+      {"task": "KG이니시스 연동 킥오프", "assignee": "C", "due": "2026-07-08", "segment_id": 3}
+    ]
+  },
+  {
+    "meeting_id": "M05",
+    "project_id": "P-DEMO",
+    "date": "2026-07-13",
+    "mode": "meeting",
+    "source": "fixture_M05_settlement.m4a",
+    "doc_refs": [{"name": "오픈 체크리스트.pptx", "source_type": "pptx", "storage_key": null}],
+    "summary": "정산 배치 첫 실행 결과 대사 불일치 3건(부분 환불 케이스) 원인 파악 — 환불 원장 선마감으로 해결. KG이니시스 연동 승인·취소 통과, 수수료 리포트 계약 조건 일치. 오픈은 9월 15일, QA 2주+보안 재점검 1주.",
+    "segments": [
+      {"id": 1, "speaker": "B", "ts_start": 11.0, "ts_end": 58.6, "text": "정산 배치 첫 버전이 돌았습니다. 어제 기준 대사 불일치 3건은 전부 부분 환불 케이스였습니다.", "topics": ["정산 배치"]},
+      {"id": 2, "speaker": "A", "ts_start": 61.0, "ts_end": 102.0, "text": "환불 이력 테이블 반영이 늦어서 생긴 문제네요. 배치 전에 환불 원장을 먼저 마감합시다.", "topics": ["정산 배치"]},
+      {"id": 3, "speaker": "C", "ts_start": 105.0, "ts_end": 151.4, "text": "KG이니시스 연동 테스트는 승인과 취소까지 통과했고, 수수료 리포트도 계약 조건과 일치합니다.", "topics": ["수수료", "오픈 준비"]},
+      {"id": 4, "speaker": "D", "ts_start": 154.0, "ts_end": 200.0, "text": "오픈 체크리스트 공유합니다. 9월 15일 오픈 기준으로 QA 2주, 보안 재점검 1주를 잡았습니다.", "topics": ["일정", "오픈 준비"]},
+      {"id": 5, "speaker": "A", "ts_start": 203.0, "ts_end": 236.0, "text": "다음 회의에서 오픈 리허설 시나리오를 확정하겠습니다.", "topics": ["오픈 준비"]}
+    ],
+    "bookmarks": [
+      {"segment_id": 2, "type": "decision", "label": "배치 전 환불 원장 선마감"},
+      {"segment_id": 4, "type": "topic_shift", "label": "오픈 체크리스트 공유"}
+    ],
+    "decisions": [
+      {"statement": "정산 배치 실행 전에 환불 원장을 먼저 마감한다.", "supersedes_hint": null, "segment_id": 2}
+    ],
+    "action_items": [
+      {"task": "오픈 리허설 시나리오 초안 작성", "assignee": "D", "due": "2026-07-20", "segment_id": 5}
+    ]
+  },
+  {
+    "meeting_id": "MX1",
+    "project_id": "P-OTHER",
+    "date": "2026-07-01",
+    "mode": "meeting",
+    "source": "fixture_MX1_chatbot.m4a",
+    "doc_refs": [],
+    "summary": "사내 챗봇 프로토타입 시연 결과 답변 정확도가 기대 이하. 다음 스프린트에서 사내 위키 문서 추가 학습, 7월 말까지.",
+    "segments": [
+      {"id": 1, "speaker": "A", "ts_start": 7.0, "ts_end": 49.0, "text": "사내 챗봇 프로토타입 시연 결과, 답변 정확도가 기대보다 낮았습니다.", "topics": ["챗봇"]},
+      {"id": 2, "speaker": "B", "ts_start": 52.0, "ts_end": 97.0, "text": "다음 스프린트에서 사내 위키 문서를 추가 학습시키겠습니다. 일정은 7월 말까지입니다.", "topics": ["챗봇", "일정"]}
+    ],
+    "bookmarks": [
+      {"segment_id": 2, "type": "action", "label": "위키 문서 추가 학습"}
+    ],
+    "decisions": [],
+    "action_items": [
+      {"task": "사내 위키 문서 학습 파이프라인 구성", "assignee": "B", "due": "2026-07-31", "segment_id": 2}
+    ]
+  }
+]

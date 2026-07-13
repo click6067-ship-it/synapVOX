@@ -1,0 +1,30 @@
+{
+  "project_id": "P-BIO",
+  "_note": "hidden 정답셋 — eval 스크립트만 읽는다. ingest/LLM/seed 매칭 입력에 절대 들어가지 않음(테스트로 강제).",
+  "session_concepts": {
+    "S1": ["C_METAB", "C_CATAB", "C_ANAB", "C_ATP", "C_FREE_E", "C_ACT_E", "C_ENZYME"],
+    "S2": ["C_ENZYME", "C_ACT_E", "C_SUBSTRATE", "C_ACTIVE_SITE"],
+    "S3": ["C_RESP", "C_GLYCOLYSIS", "C_GLUCOSE", "C_PYRUVATE", "C_ATP", "C_NADH"],
+    "S4": ["C_RESP", "C_TCA", "C_ACETYLCOA", "C_NADH", "C_FADH2", "C_CO2", "C_PYRUVATE"],
+    "S5": ["C_RESP", "C_ETC", "C_OXPHOS", "C_CHEMIOSMOSIS", "C_ATPSYNTHASE", "C_NADH", "C_FADH2", "C_ATP"],
+    "S6": ["C_PHOTO", "C_LIGHTRXN", "C_CALVIN", "C_CHLOROPLAST", "C_ATP", "C_NADPH", "C_ETC"]
+  },
+  "required_concepts_min2_sessions": ["C_RESP", "C_NADH", "C_ATP", "C_ENZYME", "C_ACT_E", "C_ETC", "C_PYRUVATE"],
+  "expected_session_relations": [
+    {"src": "S1", "dst": "S2", "rel": "CONTINUES", "via": ["C_ENZYME", "C_ACT_E"]},
+    {"src": "S3", "dst": "S4", "rel": "CONTINUES", "via": ["C_RESP", "C_NADH", "C_PYRUVATE"]},
+    {"src": "S4", "dst": "S5", "rel": "CONTINUES", "via": ["C_RESP", "C_NADH", "C_FADH2"]},
+    {"src": "S5", "dst": "S6", "rel": "EXPANDS", "via": ["C_ETC"]}
+  ],
+  "required_demo_edges": [
+    {"src": "S3", "dst": "S4", "rel": "CONTINUES"},
+    {"src": "S4", "dst": "S5", "rel": "CONTINUES"},
+    {"src": "S5", "dst": "S6", "rel": "EXPANDS"}
+  ],
+  "search_queries": [
+    {"q": "세포호흡은 어느 강의들에서 다뤄졌고 어떻게 이어졌나", "expect_sessions": ["S3", "S4", "S5"]},
+    {"q": "전자전달계와 산화적 인산화", "expect_sessions": ["S5", "S6"]},
+    {"q": "효소의 활성화에너지", "expect_sessions": ["S1", "S2"]},
+    {"q": "광합성 명반응과 캘빈 회로", "expect_sessions": ["S6"]}
+  ]
+}

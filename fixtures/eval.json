@@ -1,0 +1,17 @@
+{
+  "project_id": "P-DEMO",
+  "k": 5,
+  "pass_threshold": 8,
+  "queries": [
+    {"query": "PG사 최종적으로 어디로 정했지", "expected_meetings": ["M02", "M04"]},
+    {"query": "수수료 비교 결과", "expected_meetings": ["M02"]},
+    {"query": "정산 배치 언제 어떻게 돌리기로 했어", "expected_meetings": ["M03", "M05"]},
+    {"query": "웹훅 재시도 처리 방식", "expected_meetings": ["M02", "M03"]},
+    {"query": "환불 처리는 어떻게 하기로 했지", "expected_meetings": ["M03", "M05"]},
+    {"query": "보안 점검에서 나온 지적사항", "expected_meetings": ["M04"]},
+    {"query": "오픈 일정 조정된 거 뭐였지", "expected_meetings": ["M04", "M05"]},
+    {"query": "카드 정보 저장 정책", "expected_meetings": ["M03"]},
+    {"query": "킥오프에서 정한 프로젝트 범위", "expected_meetings": ["M01"]},
+    {"query": "토스페이먼츠 확정이 번복된 이유", "expected_meetings": ["M04"]}
+  ]
+}

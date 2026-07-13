@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>synapVOX — 회의 지식 데모</title>
+<style>
+  :root {
+    --bg: #fafaf8; --panel: #ffffff; --ink: #1c1c1a; --sub: #6b6b66;
+    --line: #e6e4de; --accent: #0f6b5c; --accent-soft: #e3f0ed;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    line-height: 1.55; padding: 32px 20px 80px;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 22px; letter-spacing: -0.02em; }
+  h1 b { color: var(--accent); }
+  .tagline { color: var(--sub); font-size: 13px; }
+  .keyrow { display: flex; gap: 8px; margin: 18px 0 28px; }
+  .keyrow input {
+    flex: 1; max-width: 320px; padding: 8px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font: inherit; background: var(--panel);
+  }
+  button {
+    padding: 8px 16px; border: 1px solid var(--accent); background: var(--accent);
+    color: #fff; border-radius: 8px; font: inherit; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: var(--accent); }
+  section { margin-bottom: 36px; }
+  h2 { font-size: 15px; margin-bottom: 4px; }
+  .note { font-size: 12.5px; color: var(--sub); margin-bottom: 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .searchrow { display: flex; gap: 8px; margin-bottom: 14px; }
+  .searchrow input { flex: 1; padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; font: inherit; }
+  .hit { padding: 12px 4px; border-top: 1px solid var(--line); }
+  .hit:first-child { border-top: 0; }
+  .hit .meta { font-size: 12px; color: var(--sub); margin-bottom: 3px; }
+  .hit .meta b { color: var(--accent); }
+  .chip {
+    display: inline-block; font-size: 11.5px; padding: 1px 8px; border-radius: 99px;
+    background: var(--accent-soft); color: var(--accent); margin-right: 4px;
+  }
+  .tl-item { display: grid; grid-template-columns: 92px 1fr; gap: 14px; padding: 14px 4px; border-top: 1px solid var(--line); }
+  .tl-item:first-child { border-top: 0; }
+  .tl-date { font-size: 12.5px; color: var(--sub); padding-top: 2px; white-space: nowrap; }
+  .tl-date b { display: block; color: var(--ink); font-size: 13px; }
+  .tl-body .summary { font-size: 13.5px; margin: 4px 0 8px; }
+  .ann { font-size: 12.5px; color: var(--sub); margin-top: 2px; }
+  .ann .k { display: inline-block; width: 58px; font-weight: 600; }
+  .ann .k.decision { color: #a04a10; }
+  .ann .k.action { color: #0f6b5c; }
+  .ann .k.bookmark { color: #5b5bd6; }
+  svg { width: 100%; height: auto; display: block; }
+  .g-edge { stroke: #b9cfc9; }
+  .g-node circle { fill: var(--panel); stroke: var(--accent); stroke-width: 1.6; }
+  .g-node text { font-size: 12px; fill: var(--ink); }
+  .g-edge-label { font-size: 10.5px; fill: var(--sub); }
+  .empty { color: var(--sub); font-size: 13px; padding: 8px 0; }
+  #status { font-size: 12.5px; color: var(--sub); margin-left: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>synap<b>VOX</b> 데모</h1>
+    <span class="tagline">회의 지식 파이프라인 — 저장 · 검색 · 공유 주제 뷰 (담당 C 파트)</span>
+  </header>
+  <div class="keyrow">
+    <input id="key" type="password" placeholder="API key 입력" autocomplete="off">
+    <button onclick="connect()">연결</button>
+    <span id="status"></span>
+  </div>
+
+  <section>
+    <h2>검색 — “X 관련 논의 뭐 있었지?”</h2>
+    <p class="note">segments 임베딩 코사인 유사도 top-5. project_id는 서버가 API key에서 결정 — 다른 프로젝트는 절대 안 섞인다.</p>
+    <div class="panel">
+      <div class="searchrow">
+        <input id="q" placeholder="예: 수수료 비교 결과 / 웹훅 재시도 / 오픈 일정" onkeydown="if(event.key==='Enter')doSearch()">
+        <button onclick="doSearch()">검색</button>
+      </div>
+      <div id="hits" class="empty">API key 연결 후 검색하세요.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>공유 주제 뷰 — 회의 간 연결</h2>
+    <p class="note">회의 노드를 공유 주제 태그(≥2)로 잇는다. 근거(공유 태그)가 엣지에 표시된다 — Graph RAG(2차)의 자리 표시가 아니라 지금 데이터로 보여줄 수 있는 정직한 뷰.</p>
+    <div class="panel"><div id="graph" class="empty">API key 연결 시 로드됩니다.</div></div>
+  </section>
+
+  <section>
+    <h2>타임라인 — 시간별 정리</h2>
+    <p class="note">날짜순 회의 + 요약 + 결정·액션·북마크 (payload 원본은 서버 내부 보관, whitelist 필드만 노출).</p>
+    <div class="panel"><div id="timeline" class="empty">API key 연결 시 로드됩니다.</div></div>
+  </section>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let KEY = localStorage.getItem("svx_key") || "";
+if (KEY) { $("key").value = KEY; }
+
+async function api(path) {
+  const r = await fetch(path, { headers: { "X-API-Key": KEY } });
+  if (!r.ok) throw new Error((await r.json()).detail || r.status);
+  return r.json();
+}
+
+async function connect() {
+  KEY = $("key").value.trim();
+  try {
+    await api("/timeline");
+    localStorage.setItem("svx_key", KEY);
+    $("status").textContent = "연결됨";
+    loadTimeline(); loadGraph();
+  } catch (e) {
+    $("status").textContent = "실패: " + e.message;
+  }
+}
+
+async function doSearch() {
+  const q = $("q").value.trim();
+  if (!q) return;
+  try {
+    const d = await api("/search?q=" + encodeURIComponent(q));
+    $("hits").className = "";
+    $("hits").innerHTML = d.hits.map(h => `
+      <div class="hit">
+        <div class="meta"><b>${h.meeting_id}</b> · ${h.speaker} · ${fmtTs(h.ts_start)} · score ${h.score.toFixed(3)}
+          ${h.topics.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+        <div>${esc(h.text)}</div>
+      </div>`).join("") || '<div class="empty">결과 없음</div>';
+  } catch (e) { $("hits").textContent = "오류: " + e.message; }
+}
+
+async function loadTimeline() {
+  const d = await api("/timeline");
+  $("timeline").className = "";
+  $("timeline").innerHTML = d.meetings.map(m => `
+    <div class="tl-item">
+      <div class="tl-date"><b>${m.meeting_id}</b>${m.date}</div>
+      <div class="tl-body">
+        <div>${m.topics.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div>
+        <div class="summary">${esc(m.summary || "")}</div>
+        ${m.annotations.map(a => `<div class="ann"><span class="k ${a.kind}">${kindKo(a.kind)}</span>${esc(a.label || "")}${a.assignee ? " — " + esc(a.assignee) : ""}${a.due ? " (~" + a.due + ")" : ""}</div>`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+async function loadGraph() {
+  const g = await api("/graph/shared-topics");
+  const W = 820, H = 380, cx = W / 2, cy = H / 2, R = 130;
+  const pos = {};
+  g.nodes.forEach((n, i) => {
+    const a = -Math.PI / 2 + i * 2 * Math.PI / g.nodes.length;
+    pos[n.meeting_id] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
+  });
+  const edges = g.edges.map(e => {
+    const p1 = pos[e.src], p2 = pos[e.dst];
+    const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
+    return `<line class="g-edge" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke-width="${e.weight * 1.4}"/>
+      <text class="g-edge-label" x="${mx}" y="${my - 4}" text-anchor="middle">${esc(e.shared_topics.join(" · "))}</text>`;
+  }).join("");
+  const nodes = g.nodes.map(n => {
+    const p = pos[n.meeting_id];
+    return `<g class="g-node"><circle cx="${p.x}" cy="${p.y}" r="24"/>
+      <text x="${p.x}" y="${p.y + 4}" text-anchor="middle" font-weight="600">${n.meeting_id}</text>
+      <text x="${p.x}" y="${p.y + 42}" text-anchor="middle" fill="#6b6b66" font-size="11">${n.date.slice(5)}</text></g>`;
+  }).join("");
+  $("graph").className = "";
+  $("graph").innerHTML =
+    (g.fallback ? '<p class="note">⚠ 공유 태그 ≥2 엣지가 없어 임계값 1로 fallback</p>' : "") +
+    `<svg viewBox="0 0 ${W} ${H}">${edges}${nodes}</svg>`;
+}
+
+const fmtTs = s => { const m = Math.floor(s / 60); return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`; };
+const kindKo = k => ({ decision: "결정", action: "액션", bookmark: "북마크" }[k] || k);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+</script>
+</body>
+</html>

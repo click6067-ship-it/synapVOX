@@ -1,0 +1,33 @@
+{
+  "project_id": "P-BIO",
+  "seed_version": "campbell-bio1-v1",
+  "concepts": [
+    {"concept_id": "C_METAB", "label": "물질대사", "aliases": ["물질대사", "대사", "metabolism"], "relation_stoplist": false},
+    {"concept_id": "C_CATAB", "label": "이화작용", "aliases": ["이화작용", "이화", "catabolism"], "relation_stoplist": false},
+    {"concept_id": "C_ANAB", "label": "동화작용", "aliases": ["동화작용", "동화", "anabolism"], "relation_stoplist": false},
+    {"concept_id": "C_ATP", "label": "ATP", "aliases": ["ATP", "아데노신삼인산"], "relation_stoplist": true},
+    {"concept_id": "C_FREE_E", "label": "자유에너지", "aliases": ["자유에너지", "free energy"], "relation_stoplist": false},
+    {"concept_id": "C_ACT_E", "label": "활성화에너지", "aliases": ["활성화에너지", "activation energy"], "relation_stoplist": false},
+    {"concept_id": "C_ENZYME", "label": "효소", "aliases": ["효소", "enzyme"], "relation_stoplist": false},
+    {"concept_id": "C_SUBSTRATE", "label": "기질", "aliases": ["기질", "substrate"], "relation_stoplist": false},
+    {"concept_id": "C_ACTIVE_SITE", "label": "활성부위", "aliases": ["활성부위", "active site"], "relation_stoplist": false},
+    {"concept_id": "C_RESP", "label": "세포호흡", "aliases": ["세포호흡", "세포 호흡", "cellular respiration"], "relation_stoplist": false},
+    {"concept_id": "C_GLYCOLYSIS", "label": "해당과정", "aliases": ["해당과정", "해당 과정", "glycolysis"], "relation_stoplist": false},
+    {"concept_id": "C_GLUCOSE", "label": "포도당", "aliases": ["포도당", "glucose"], "relation_stoplist": false},
+    {"concept_id": "C_PYRUVATE", "label": "피루브산", "aliases": ["피루브산", "pyruvate"], "relation_stoplist": false},
+    {"concept_id": "C_NADH", "label": "NADH", "aliases": ["NADH"], "relation_stoplist": false},
+    {"concept_id": "C_TCA", "label": "시트르산 회로", "aliases": ["시트르산 회로", "시트르산회로", "TCA 회로", "TCA회로", "크렙스 회로", "citric acid cycle"], "relation_stoplist": false},
+    {"concept_id": "C_ACETYLCOA", "label": "아세틸 CoA", "aliases": ["아세틸 CoA", "아세틸-CoA", "아세틸CoA", "acetyl-CoA"], "relation_stoplist": false},
+    {"concept_id": "C_FADH2", "label": "FADH2", "aliases": ["FADH2", "FADH₂"], "relation_stoplist": false},
+    {"concept_id": "C_CO2", "label": "이산화탄소", "aliases": ["이산화탄소", "CO2", "CO₂"], "relation_stoplist": false},
+    {"concept_id": "C_ETC", "label": "전자전달계", "aliases": ["전자전달계", "전자 전달계", "electron transport chain", "ETC"], "relation_stoplist": false},
+    {"concept_id": "C_OXPHOS", "label": "산화적 인산화", "aliases": ["산화적 인산화", "산화적인산화", "oxidative phosphorylation"], "relation_stoplist": false},
+    {"concept_id": "C_CHEMIOSMOSIS", "label": "화학삼투", "aliases": ["화학삼투", "화학 삼투", "chemiosmosis"], "relation_stoplist": false},
+    {"concept_id": "C_ATPSYNTHASE", "label": "ATP 합성효소", "aliases": ["ATP 합성효소", "ATP합성효소", "ATP synthase"], "relation_stoplist": false},
+    {"concept_id": "C_PHOTO", "label": "광합성", "aliases": ["광합성", "photosynthesis"], "relation_stoplist": false},
+    {"concept_id": "C_LIGHTRXN", "label": "명반응", "aliases": ["명반응", "light reaction"], "relation_stoplist": false},
+    {"concept_id": "C_CALVIN", "label": "캘빈 회로", "aliases": ["캘빈 회로", "캘빈회로", "Calvin cycle"], "relation_stoplist": false},
+    {"concept_id": "C_CHLOROPLAST", "label": "엽록체", "aliases": ["엽록체", "chloroplast"], "relation_stoplist": false},
+    {"concept_id": "C_NADPH", "label": "NADPH", "aliases": ["NADPH"], "relation_stoplist": false}
+  ]
+}
