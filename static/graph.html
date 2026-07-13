@@ -25,7 +25,7 @@
 
     --mark:#f4e6b8;
     --shadow:0 1px 2px rgba(40,36,26,.05),0 6px 20px rgba(40,36,26,.05);
-    --radius:12px;
+    --radius:15px;
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -71,28 +71,31 @@
 
   /* ---- top bar ------------------------------------------------------- */
   .topbar{
-    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
-    padding:12px 20px; border-bottom:1px solid var(--line); background:var(--panel);
+    display:flex; align-items:center; gap:12px;
+    padding:13px 22px; border-bottom:1px solid var(--line); background:var(--panel);
   }
-  .topbar h1{font-size:19px; margin:0; letter-spacing:-.01em}
+  .topbar h1{font-size:20px; margin:0; letter-spacing:-.015em; white-space:nowrap}
   .topbar h1 b{color:var(--conc); font-weight:700}
-  .topbar .tag{color:var(--sub); font-size:12.5px}
-  .topbar .spacer{flex:1}
-  .conn{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:6px}
-  .conn .dot{width:8px;height:8px;border-radius:50%;background:var(--faint)}
+  .topbar .tag{color:var(--sub); font-size:12.5px; flex:1; min-width:0;
+               overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .conn{font-size:12px; color:var(--sub); display:flex; align-items:center; gap:6px; white-space:nowrap}
+  .conn .dot{width:8px;height:8px;border-radius:50%;background:var(--faint); flex:none}
   .conn.ok .dot{background:var(--conc)}
   .conn.bad .dot{background:var(--e-continues)}
   .theme-btn{
     border:1px solid var(--line); background:var(--panel-2); color:var(--sub);
-    border-radius:8px; padding:5px 10px; font:inherit; font-size:12px; cursor:pointer;
+    border-radius:9px; padding:7px 12px; font:inherit; font-size:12px; cursor:pointer; flex:none;
   }
+  .theme-btn:hover{color:var(--ink)}
 
-  /* ---- 3-column layout ---------------------------------------------- */
-  .app{flex:1; display:grid; grid-template-columns:300px minmax(0,1fr) 372px; min-height:0}
-  .col{min-height:0; overflow:auto; padding:16px}
-  .col.left{border-right:1px solid var(--line); background:var(--panel-2)}
-  .col.center{overflow:hidden; display:flex; flex-direction:column; padding:0; background:var(--bg)}
-  .col.right{border-left:1px solid var(--line); background:var(--panel-2)}
+  /* ---- 3-column layout (stacks to app-like vertical on narrow) ------ */
+  .app{flex:1; display:grid; min-height:0;
+       grid-template-columns:340px minmax(0,1fr) 384px;
+       grid-template-areas:"left center right"}
+  .col{min-height:0; overflow:auto; padding:18px}
+  .col.left{grid-area:left; border-right:1px solid var(--line); background:var(--panel-2)}
+  .col.center{grid-area:center; overflow:hidden; display:flex; flex-direction:column; padding:0; background:var(--bg)}
+  .col.right{grid-area:right; border-left:1px solid var(--line); background:var(--panel-2)}
 
   h2{font-size:12px; text-transform:none; letter-spacing:.01em; color:var(--sub);
      margin:0 0 10px; font-weight:600}
@@ -151,7 +154,6 @@
   /* text-ingest card */
   .ti-head{display:flex; align-items:center; justify-content:space-between; margin:18px 0 10px}
   .ti-head h2{margin:0}
-  #textCard{padding:14px}
   .ti-field{margin-bottom:9px}
   .ti-field:last-of-type{margin-bottom:0}
   .ti-field label{display:block; font-size:11px; color:var(--sub); margin-bottom:3px}
@@ -166,6 +168,32 @@
   #tiMsg{font-size:11.5px; margin-top:8px; min-height:1em; color:var(--sub)}
   #tiMsg.err{color:var(--e-continues)}
   #tiMsg.ok{color:var(--conc)}
+
+  /* ---- hero: text paste = primary entry ----------------------------- */
+  .hero{background:var(--panel); border:1px solid var(--line); border-radius:18px;
+        box-shadow:var(--shadow); padding:18px 18px 20px; margin-bottom:16px}
+  .hero-title{font-size:20px; margin:0 0 6px; letter-spacing:-.015em; color:var(--ink)}
+  .hero-sub{font-size:12.5px; color:var(--sub); margin:0 0 15px; line-height:1.55}
+  .ti-row{display:grid; grid-template-columns:1fr 1fr; gap:9px}
+  .req{color:var(--e-continues)}
+  .opt{color:var(--faint); font-weight:400}
+  .act.big{width:100%; padding:12px 16px; font-size:14px; border-radius:12px; margin-top:13px; font-weight:600}
+  .act.block{width:100%}
+
+  /* ---- sample: secondary CTA ---------------------------------------- */
+  .sample-cta{margin:0 0 16px}
+  .sample-cta .or{display:flex; align-items:center; gap:10px; font-size:11px; color:var(--faint); margin:0 0 10px}
+  .sample-cta .or::before,.sample-cta .or::after{content:""; flex:1; height:1px; background:var(--line)}
+
+  /* ---- aux: session list / workflow (collapsed) --------------------- */
+  details.aux{border:1px solid var(--line); border-radius:14px; background:var(--panel-2); margin-bottom:4px}
+  details.aux>summary{cursor:pointer; padding:13px 15px; font-size:12.5px; font-weight:600; color:var(--sub);
+    list-style:none; display:flex; align-items:center; justify-content:space-between}
+  details.aux>summary::-webkit-details-marker{display:none}
+  details.aux>summary::after{content:"⌄"; font-size:16px; color:var(--faint); transition:transform .2s; line-height:1}
+  details.aux[open]>summary::after{transform:rotate(180deg)}
+  .aux-body{padding:2px 14px 14px}
+  .aux-body .btn-row{margin:12px 0 0}
 
   /* ---- center: graph ------------------------------------------------- */
   .gtools{
@@ -283,20 +311,38 @@
   .subhd{font-size:11px; color:var(--sub); font-weight:600; margin:14px 0 6px}
 
   /* responsive: stack */
+  /* ---- responsive: app-like vertical stack (graph on top) ----------- */
   @media (max-width:1040px){
-    body{overflow:auto}
-    .app{grid-template-columns:1fr; min-height:0}
-    .col{overflow:visible}
+    body{overflow:auto; height:auto}
+    .app{height:auto; grid-template-columns:1fr;
+         grid-template-areas:"center" "left" "right"}
+    .col{overflow:visible; height:auto; padding:16px}
     .col.left,.col.right{border:0; border-bottom:1px solid var(--line)}
-    .col.center{height:70vh; min-height:440px}
+    .col.center{height:52vh; min-height:360px; border-bottom:1px solid var(--line)}
+  }
+  @media (max-width:760px){
+    .topbar{padding:11px 15px; gap:9px}
+    .col{padding:13px}
+    .col.center{height:46vh; min-height:300px}
+    #connText{display:none}
+    .gtools{padding:9px 12px; gap:7px 10px}
+    .filters{gap:5px 10px}
+    .filters label{font-size:12.5px; padding:2px 0}
+    /* larger touch targets on mobile */
+    button.act{padding:10px 14px; font-size:13px}
+    .act.big{padding:14px 16px; font-size:15px}
+    .mini{padding:8px 12px}
+    .searchrow input{padding:11px 12px}
+    .ti-field input,.ti-field textarea{padding:10px 11px; font-size:13px}
+    .hero{padding:16px 15px 18px}
+    .hero-title{font-size:19px}
   }
 </style>
 </head>
 <body>
   <header class="topbar">
     <h1 class="serif">Synap<b>Vox</b></h1>
-    <span class="tag">캠벨 생명과학 강의 — 세션을 가로지르는 개념 지식 그래프</span>
-    <span class="spacer"></span>
+    <span class="tag">텍스트를 붙여넣으면 개념이 세션을 가로질러 이어지는 지식 그래프로.</span>
     <span id="conn" class="conn"><span class="dot"></span><span id="connText">연결 확인 중…</span></span>
     <button class="theme-btn" id="themeBtn" title="라이트/다크 전환">화면 톤</button>
   </header>
@@ -304,51 +350,62 @@
   <div class="app">
     <!-- ============ LEFT: workflow / ingest ============ -->
     <div class="col left">
-      <h2>워크플로 — 세션 적재</h2>
-      <div class="btn-row">
-        <button class="act" id="btnNext">다음 세션 적재</button>
-        <button class="act ghost" id="btnAll">전체 적재</button>
-        <button class="act warn" id="btnReset">리셋</button>
-      </div>
-      <div class="card"><div class="sess-list" id="corpusList">
-        <div class="empty" style="padding:14px">코퍼스를 불러오는 중…</div>
-      </div></div>
-
-      <div id="addedWrap" style="display:none">
-        <div class="ti-head"><h2>추가된 세션</h2></div>
-        <div class="card"><div class="sess-list" id="addedList"></div></div>
-      </div>
-
-      <div class="ti-head">
-        <h2>텍스트로 강의 추가</h2>
-        <button class="mini" id="tiToggle" aria-expanded="true">접기</button>
-      </div>
-      <div class="card" id="textCard">
+      <!-- HERO — 텍스트 붙여넣기 = 주 진입점 -->
+      <section class="hero">
+        <h2 class="hero-title serif">텍스트로 지식 그래프 만들기</h2>
+        <p class="hero-sub">강의·회의 텍스트를 붙여넣으면 개념이 세션을 가로질러 이어지는 지식 그래프로 만들어 드려요.</p>
         <div class="ti-field">
-          <label for="tiTitle">제목 <span style="color:var(--faint)">(선택)</span></label>
-          <input id="tiTitle" autocomplete="off" placeholder="예: 광합성 — 명반응">
-        </div>
-        <div class="ti-field">
-          <label for="tiChapter">단원 <span style="color:var(--faint)">(선택)</span></label>
-          <input id="tiChapter" autocomplete="off" placeholder="예: 8장 광합성">
-        </div>
-        <div class="ti-field">
-          <label for="tiText">본문 <span style="color:var(--e-continues)">*</span></label>
+          <label for="tiText">본문 <span class="req">*</span></label>
           <textarea id="tiText" placeholder="강의 전사나 여러 섹션을 붙여넣으세요. 빈 줄로 섹션을 나눕니다."></textarea>
         </div>
-        <div class="ti-field">
-          <label for="tiKeywords">핵심 개념 <span style="color:var(--faint)">(선택)</span></label>
-          <input id="tiKeywords" autocomplete="off" placeholder="쉼표로 구분 — 비우면 캠벨 생명과학 사전으로 자동 인식">
+        <div class="ti-row">
+          <div class="ti-field">
+            <label for="tiTitle">제목 <span class="opt">(선택)</span></label>
+            <input id="tiTitle" autocomplete="off" placeholder="광합성 — 명반응">
+          </div>
+          <div class="ti-field">
+            <label for="tiChapter">단원 <span class="opt">(선택)</span></label>
+            <input id="tiChapter" autocomplete="off" placeholder="8장 광합성">
+          </div>
         </div>
-        <button class="act" id="tiSubmit" disabled>그래프에 추가</button>
+        <div class="ti-field">
+          <label for="tiKeywords">핵심 개념 <span class="opt">(선택)</span></label>
+          <input id="tiKeywords" autocomplete="off" placeholder="쉼표로 구분 — 비우면 자동 인식">
+        </div>
+        <button class="act big" id="tiSubmit" disabled>그래프에 추가</button>
         <div id="tiMsg"></div>
+      </section>
+
+      <!-- SAMPLE — 보조 CTA -->
+      <div class="sample-cta">
+        <div class="or">또는 샘플로 시작</div>
+        <button class="act ghost block" id="btnAll">캠벨 생명과학 6강 불러오기</button>
       </div>
 
+      <!-- 파이프라인 (텍스트/샘플 적재 공용 애니메이션) -->
       <div class="card" id="pipeline">
         <div class="head" id="pipeHead">파이프라인</div>
         <div id="pipeSteps"></div>
         <div class="stat-grid" id="pipeStats"></div>
       </div>
+
+      <!-- 보조 — 세션 목록 · 워크플로 (접이식) -->
+      <details class="aux" id="sessionsDetails">
+        <summary>세션 목록 · 워크플로</summary>
+        <div class="aux-body">
+          <div class="card"><div class="sess-list" id="corpusList">
+            <div class="empty" style="padding:14px">코퍼스를 불러오는 중…</div>
+          </div></div>
+          <div id="addedWrap" style="display:none">
+            <div class="ti-head"><h2>추가된 세션</h2></div>
+            <div class="card"><div class="sess-list" id="addedList"></div></div>
+          </div>
+          <div class="btn-row">
+            <button class="act" id="btnNext">다음 세션 적재</button>
+            <button class="act warn" id="btnReset">리셋</button>
+          </div>
+        </div>
+      </details>
     </div>
 
     <!-- ============ CENTER: graph ============ -->
@@ -375,7 +432,7 @@
           <g id="edgeLayer"></g>
           <g id="nodeLayer"></g>
         </svg>
-        <div class="g-empty" id="graphEmpty">세션을 적재하면 개념 그래프가 자랍니다.</div>
+        <div class="g-empty" id="graphEmpty">텍스트를 붙여넣거나 샘플을 불러오면 지식 그래프가 여기에 자랍니다.</div>
         <div class="legend" id="legend" style="display:none">
           <div class="row"><span class="mk-sess"></span>세션 (강의)</div>
           <div class="row"><span class="mk-conc"></span>개념</div>
@@ -639,12 +696,6 @@ async function ingestText() {
 
 $("#tiText").addEventListener("input", updateTiSubmit);
 $("#tiSubmit").addEventListener("click", ingestText);
-$("#tiToggle").addEventListener("click", () => {
-  const card = $("#textCard"), open = card.style.display !== "none";
-  card.style.display = open ? "none" : "";
-  $("#tiToggle").textContent = open ? "펼치기" : "접기";
-  $("#tiToggle").setAttribute("aria-expanded", String(!open));
-});
 
 /* =====================================================================
    2) FORCE-DIRECTED GRAPH (SVG, O(N^2) repulsion + springs)
