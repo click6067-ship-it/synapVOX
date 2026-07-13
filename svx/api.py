@@ -45,7 +45,7 @@ def keywords_to_concepts(keywords) -> list[dict]:
     return out
 
 
-def create_app(db_path, corpus, seeds, key_map, cors_origins, embedder=None, llm=None):
+def create_app(db_path, corpus, seeds, key_map, cors_origins, embedder=None, llm=None, diag=None):
     app = FastAPI(title="SynapVox — 세션간 개념 연결 데모")
     app.add_middleware(CORSMiddleware, allow_origins=cors_origins,
                        allow_methods=["GET", "POST"], allow_headers=["X-API-Key"])
@@ -149,8 +149,13 @@ def create_app(db_path, corpus, seeds, key_map, cors_origins, embedder=None, llm
 
     @app.get("/config")
     def config():
-        return {"rag_enabled": rag is not None,
-                "chat_model": getattr(llm, "chat_model", None),
-                "embed_model": getattr(embedder, "model_name", None)}
+        out = {"rag_enabled": rag is not None,
+               "chat_model": getattr(llm, "chat_model", None),
+               "embed_model": getattr(embedder, "model_name", None)}
+        try:
+            out["diag"] = {**(diag or {}), "db_counts": store.counts()}
+        except Exception as e:
+            out["diag"] = {**(diag or {}), "db_counts_err": str(e)}
+        return out
 
     return app

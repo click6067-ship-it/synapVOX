@@ -24,3 +24,4 @@ node_modules/
 
 # 배포용 시드 DB는 커밋 (샘플+캐시)
 !deploy/seed.db
+.vercel

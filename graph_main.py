@@ -39,12 +39,16 @@ KEY = os.environ.get("DEMO_API_KEY", "demo-bio")
 CORS = os.environ.get("DEMO_CORS", "*").split(",")
 SEED_DB = ROOT / "deploy" / "seed.db"
 
-# 배포 콜드스타트: 쓰기 가능한 위치(/tmp)에 시드 DB(샘플+캐시)를 깔아 즉시 데모
-if not pathlib.Path(DB).exists() and SEED_DB.exists():
+# 배포 콜드스타트: 쓰기 가능한 위치(/tmp)에 시드 DB(샘플+캐시)를 깔아 즉시 데모.
+# 인스턴스마다 자족하도록, 시드가 있으면 항상 덮어쓴다(사용자 추가분은 인스턴스 수명 동안만 유지).
+DIAG = {"db": DB, "seed_db": str(SEED_DB), "seed_exists": SEED_DB.exists(), "seeded": False, "err": None}
+if SEED_DB.exists() and str(DB) != str(SEED_DB):
     try:
-        shutil.copy(SEED_DB, DB)
-    except Exception:
-        pass
+        if not pathlib.Path(DB).exists():
+            shutil.copy(SEED_DB, DB)
+        DIAG["seeded"] = True
+    except Exception as e:
+        DIAG["err"] = str(e)
 
 _data = json.loads((ROOT / "corpus" / "campbell_sessions.json").read_text())
 corpus = {s["external_id"]: {**s, "project_id": _data["project_id"]} for s in _data["sessions"]}
@@ -58,4 +62,4 @@ if os.environ.get("OPENAI_API_KEY"):
     embedder = OpenAIEmbedder(llm)
 
 app = create_app(db_path=DB, corpus=corpus, seeds=seeds, key_map=key_map,
-                 cors_origins=CORS, embedder=embedder, llm=llm)
+                 cors_origins=CORS, embedder=embedder, llm=llm, diag=DIAG)

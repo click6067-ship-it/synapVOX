@@ -271,6 +271,11 @@ class Store:
             r = c.execute("SELECT MAX(seq) m FROM sessions WHERE project_id=?", (project_id,)).fetchone()
             return (r["m"] or 0)
 
+    def counts(self):
+        with self._conn() as c:
+            return {t: c.execute(f"SELECT COUNT(*) n FROM {t}").fetchone()["n"]
+                    for t in ("sessions", "segments", "extraction_cache")}
+
     def project_sessions(self, project_id):
         with self._conn() as c:
             return [dict(r) for r in c.execute(
