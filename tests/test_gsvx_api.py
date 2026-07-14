@@ -23,7 +23,7 @@ class StubEngine:
     def __init__(self):
         self.ingested, self.reset_called = [], False
         self.last_ingest_project = self.last_reset_project = None
-        self.last_project = None
+        self.last_project = self.last_ask = self.last_search = None
         # Configurable so cap tests can simulate a full project / many projects.
         self.sessions_count = 0
         self._projects = [{"project": "P-BIO", "sessions": 2, "concepts": 5}]
@@ -48,6 +48,14 @@ class StubEngine:
 
     async def list_projects(self):
         return self._projects
+
+    async def ask(self, pid, q, k=8):
+        self.last_ask = (pid, q, k)
+        return {"query": q, "answer": "stub 답변", "hits": [], "expansion": {"nodes": [], "edges": []}}
+
+    async def search(self, pid, q, k=8):
+        self.last_search = (pid, q, k)
+        return ([], [])
 
     async def graph(self, pid):
         self.last_project = pid
@@ -191,6 +199,36 @@ def test_rate_limit_not_bypassable_via_forged_xff():
         assert client.post("/ingest-text", json={"text": "x"}, headers=hdr).status_code == 200, i
     hdr = {**h(), "X-Forwarded-For": "1.1.1.1, 203.0.113.7"}
     assert client.post("/ingest-text", json={"text": "x"}, headers=hdr).status_code == 429
+
+
+def test_ask_rate_limited():
+    # 공개 /ask(LLM 호출)도 per-IP 속도 제한 — 60회까지, 61회째 429.
+    client, _ = _client(readonly=False)
+    for i in range(60):
+        assert client.get("/ask?q=hi", headers=h()).status_code == 200, i
+    assert client.get("/ask?q=hi", headers=h()).status_code == 429
+
+
+def test_ask_query_length_capped():
+    client, _ = _client(readonly=False)
+    r = client.get("/ask", params={"q": "가" * 1001}, headers=h())
+    assert r.status_code == 413
+
+
+def test_ask_k_is_clamped():
+    client, engine = _client(readonly=False)
+    r = client.get("/ask?q=hi&k=999", headers=h())
+    assert r.status_code == 200
+    assert engine.last_ask[2] == 20  # _MAX_K 로 클램프(비용/지연 폭증 방지)
+
+
+def test_ask_and_search_have_separate_buckets():
+    # /ask 버킷을 소진해도 /search는 별개 버킷 → 서로 굶기지 않음.
+    client, _ = _client(readonly=False)
+    for _ in range(60):
+        client.get("/ask?q=hi", headers=h())
+    assert client.get("/ask?q=hi", headers=h()).status_code == 429
+    assert client.get("/search?q=hi", headers=h()).status_code == 200
 
 
 def test_rate_limit_is_app_scoped():

@@ -35,7 +35,11 @@ _MAX_PROJECTS = 60  # 새 그룹 무한 생성 방어(신규 프로젝트 최초
 # per-IP 쓰기 속도 제한 — 총량 캡(위)이 '얼마나 많이'를 막는다면 이건 '얼마나 빨리'를 막는다.
 # shipped 데모 키로 스크립트가 짧은 시간에 비싼 LLM 추출을 폭주시키는 것을 차단.
 _RATE_WINDOW_S = 3600  # 창(초)
-_RATE_MAX_WRITES = 30  # 창당 IP별 쓰기 허용 횟수(팀 데모 정상 사용에는 충분히 넉넉)
+_RATE_MAX_WRITES = 30   # 쓰기(ingest): 창당 IP별 허용 횟수
+_RATE_MAX_ASK = 60      # RAG 답변(/ask, LLM 호출): 정상 대화엔 넉넉, 폭주는 차단
+_RATE_MAX_SEARCH = 120  # /search(벡터 검색, LLM 없음 — 더 저렴): 상대적으로 넉넉
+_MAX_QUERY_CHARS = 1000  # /ask·/search 질의 길이 상한
+_MAX_K = 20             # 검색 결과 수(k) 상한 — 과도한 k로 비용/지연 폭증 방지
 # 신뢰 프록시 홉 수 — 실제 클라이언트 IP는 X-Forwarded-For의 '오른쪽에서 이만큼' 들어간 항목.
 # 신뢰 프록시(Render 등)가 오른쪽에 실제 IP를 덧붙이므로, 왼쪽 홉(클라이언트 위조 가능)을
 # 쓰면 rate limit이 헤더 위조로 우회된다. 기본 1 = 프록시 1대 뒤(Render).
@@ -90,15 +94,22 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
             return fwd[max(0, len(fwd) - _XFF_TRUST_HOPS)]
         return request.client.host if request.client else "?"
 
-    def _rate_limit(request: Request):
-        ip = _client_ip(request)
+    def _rate_limit(request: Request, bucket: str, limit: int):
+        # per-(IP,bucket) sliding window — 쓰기·질의·검색이 서로 다른 예산을 갖는다.
+        key = (_client_ip(request), bucket)
         now = time.time()
-        dq = _write_log.setdefault(ip, deque())
+        dq = _write_log.setdefault(key, deque())
         while dq and now - dq[0] > _RATE_WINDOW_S:
             dq.popleft()
-        if len(dq) >= _RATE_MAX_WRITES:
-            raise HTTPException(429, "쓰기 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.")
+        if len(dq) >= limit:
+            raise HTTPException(429, "요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.")
         dq.append(now)
+
+    def _guard_query(q: str, k: int) -> int:
+        # 공개 데모 키로 비싼 LLM/검색을 남용하지 못하게 질의 길이·k를 제한.
+        if len(q or "") > _MAX_QUERY_CHARS:
+            raise HTTPException(413, f"질문이 너무 깁니다 (최대 {_MAX_QUERY_CHARS:,}자).")
+        return max(1, min(k, _MAX_K))
 
     def _guard_write():
         if readonly:
@@ -143,7 +154,7 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
     @app.post("/ingest")
     async def ingest(body: dict, request: Request, pid: str = Depends(project_id)):
         _guard_write()
-        _rate_limit(request)
+        _rate_limit(request, "write", _RATE_MAX_WRITES)
         key = body.get("session_key")
         s = corpus.get(key)
         if not s:
@@ -155,7 +166,7 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
     @app.post("/ingest-text")
     async def ingest_text(body: dict, request: Request, pid: str = Depends(project_id)):
         _guard_write()
-        _rate_limit(request)  # per-IP 속도 제한이 신규 프로젝트 생성 빈도까지 bound한다.
+        _rate_limit(request, "write", _RATE_MAX_WRITES)  # 신규 프로젝트 생성 빈도까지 bound.
         project = _resolve_project(body.get("project"), pid)
         text = (body.get("text") or "").strip()
         if not text:
@@ -200,12 +211,17 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
         return d
 
     @app.get("/search")
-    async def search(q: str, k: int = 8, pid: str = Depends(project_id)):
+    async def search(q: str, request: Request, k: int = 8, pid: str = Depends(project_id)):
+        _rate_limit(request, "search", _RATE_MAX_SEARCH)
+        k = _guard_query(q, k)
         hits, _ = await engine.search(pid, q, k)
         return {"query": q, "hits": hits, "expansion": {"nodes": [], "edges": []}}
 
     @app.get("/ask")
-    async def ask(q: str, k: int = 8, pid: str = Depends(project_id)):
+    async def ask(q: str, request: Request, k: int = 8, pid: str = Depends(project_id)):
+        # 공개 데모 키로 비싼 LLM 답변을 폭주시키지 못하게 per-IP 속도 제한 + 질의 길이·k 상한.
+        _rate_limit(request, "ask", _RATE_MAX_ASK)
+        k = _guard_query(q, k)
         return await engine.ask(pid, q, k)
 
     @app.get("/timeline")
