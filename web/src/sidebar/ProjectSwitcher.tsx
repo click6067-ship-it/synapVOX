@@ -15,8 +15,9 @@ export function ProjectSwitcher(props: {
   projects: Project[]
   collapsed: boolean
   onSelectProject(p: string): void
+  onNewProject(): void
 }): JSX.Element {
-  const { project, projects, collapsed, onSelectProject } = props
+  const { project, projects, collapsed, onSelectProject, onNewProject } = props
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -41,6 +42,11 @@ export function ProjectSwitcher(props: {
   function choose(p: string) {
     setOpen(false)
     if (p !== project) onSelectProject(p)
+  }
+
+  function startNew() {
+    setOpen(false)
+    onNewProject()
   }
 
   // Collapsed rail: a non-interactive monogram badge (dropdown would be clipped
@@ -106,6 +112,14 @@ export function ProjectSwitcher(props: {
               </li>
             )
           })}
+          <li className="projectswitcher__foot">
+            <button type="button" className="projectswitcher__new" onClick={startNew}>
+              <span className="projectswitcher__newplus" aria-hidden="true">
+                ＋
+              </span>
+              새 프로젝트
+            </button>
+          </li>
         </ul>
       )}
     </div>

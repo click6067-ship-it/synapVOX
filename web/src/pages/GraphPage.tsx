@@ -32,6 +32,7 @@ export default function GraphPage() {
   const [collapsed, setCollapsed] = useState(false)
   const [hoverSession, setHoverSession] = useState<string | null>(null)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [uploadMode, setUploadMode] = useState<'add' | 'new'>('add')
   const [panel, setPanel] = useState<'detail' | 'answer' | null>(null)
   const [askExpansion, setAskExpansion] = useState<Set<string> | null>(null)
 
@@ -64,17 +65,27 @@ export default function GraphPage() {
     [detail],
   )
 
-  // Upload succeeded → refetch the full graph and grow it in (mergeSubgraph
-  // dedupes, so only the new session + its concepts are added; existing nodes
-  // keep their positions → no relayout, Growth Ring fires).
-  const handleIngested = useCallback(async () => {
-    try {
-      const raw = await getGraph(project)
-      graphRef.current?.growWith?.(buildForceData(mapGraph(raw)))
-    } catch {
-      /* graph refresh failed — leave the current graph as-is */
-    }
-  }, [project])
+  // Upload succeeded. Two outcomes, keyed on where the lecture actually landed:
+  //   • same project → refetch the full graph and grow it in (mergeSubgraph
+  //     dedupes, so only the new session + its concepts are added; existing
+  //     nodes keep their positions → no relayout, Growth Ring fires).
+  //   • a new project (new-project mode's fresh slug) → navigate into it; its
+  //     GraphView mounts and fetches the freshly-seeded graph.
+  const handleIngested = useCallback(
+    async (target: string) => {
+      if (target !== project) {
+        navigate(`/p/${target}`)
+        return
+      }
+      try {
+        const raw = await getGraph(project)
+        graphRef.current?.growWith?.(buildForceData(mapGraph(raw)))
+      } catch {
+        /* graph refresh failed — leave the current graph as-is */
+      }
+    },
+    [project, navigate],
+  )
 
   const handleAsk = useCallback(
     (q: string) => {
@@ -121,7 +132,14 @@ export default function GraphPage() {
       collapsed={collapsed}
       onToggleCollapse={() => setCollapsed((c) => !c)}
       onSelectProject={(p) => navigate(`/p/${p}`)}
-      onOpenUpload={() => setUploadOpen(true)}
+      onNewProject={() => {
+        setUploadMode('new')
+        setUploadOpen(true)
+      }}
+      onOpenUpload={() => {
+        setUploadMode('add')
+        setUploadOpen(true)
+      }}
       onHoverSession={setHoverSession}
     />
   )
@@ -157,7 +175,13 @@ export default function GraphPage() {
   return (
     <>
       <AppShell sidebar={sidebar} canvas={canvas} drawer={drawer} sidebarCollapsed={collapsed} />
-      <UploadDrawer project={project} open={uploadOpen} onClose={() => setUploadOpen(false)} onIngested={handleIngested} />
+      <UploadDrawer
+        project={project}
+        open={uploadOpen}
+        mode={uploadMode}
+        onClose={() => setUploadOpen(false)}
+        onIngested={handleIngested}
+      />
     </>
   )
 }

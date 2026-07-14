@@ -91,6 +91,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const selectedIdRef = useRef<string | null>(null)
   const highlightNodesRef = useRef<Set<string>>(new Set())
   const highlightLinksRef = useRef<Set<FLink>>(new Set())
+  const askIdsRef = useRef<Set<string> | null>(null) // RAG expansion nodes → persistent highlight
   const pointerRef = useRef({ x: 0, y: 0 })
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const pulseCounterRef = useRef(0) // monotonic id so each growth fires a fresh ring
@@ -101,7 +102,16 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const [errMsg, setErrMsg] = useState('')
   const [data, setData] = useState<GraphData | null>(null)
   const [hover, setHover] = useState<FNode | null>(null) // hovered node → tooltip + tick
+  const [, setAskTick] = useState(0) // re-render tick when RAG expansion changes
   const [pulse, setPulse] = useState<GrowthPulse | null>(null) // Growth Ring fire signal
+
+  // Sync the RAG expansion set into a ref (canvas accessors read live) + one
+  // re-render so drawNode/linkColor re-run. Highlights the answer's evidence
+  // concepts on the graph ("질문하면 그래프가 근거로 반응") — dims the rest.
+  useEffect(() => {
+    askIdsRef.current = props.askExpansionIds && props.askExpansionIds.size ? props.askExpansionIds : null
+    setAskTick((t) => t + 1)
+  }, [props.askExpansionIds])
 
   // ── Task 9: incremental growth ────────────────────────────────────────────
   // Merge a freshly-fetched session subgraph into the LIVE graph without
@@ -257,14 +267,20 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       const x = node.x ?? 0
       const y = node.y ?? 0
 
-      // Hover focus/dim (Task 7): focused = 1, 1-hop neighbor = 0.95, others 0.12.
+      // Focus/dim: hover (Task 7) takes precedence; else the RAG expansion set
+      // (evidence for the current answer) highlights + dims the rest.
       const hoverId = hoverIdRef.current
+      const askIds = askIdsRef.current
       const hovering = hoverId !== null
+      const asking = !hovering && !!askIds && askIds.size > 0
+      const inAsk = asking && askIds!.has(node.id)
       let nodeAlpha = 1
       if (hovering) {
         if (node.id === hoverId) nodeAlpha = 1
         else if (highlightNodesRef.current.has(node.id)) nodeAlpha = 0.95
         else nodeAlpha = 0.12
+      } else if (asking) {
+        nodeAlpha = inAsk ? 1 : 0.1
       }
 
       ctx.save()
@@ -277,11 +293,20 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       ctx.arc(x, y, r, 0, 2 * Math.PI)
       ctx.fillStyle = color
       ctx.fill()
+      // Evidence marker: a rule-blue ring around RAG-cited concepts.
+      if (inAsk) {
+        ctx.globalAlpha = 1
+        ctx.lineWidth = 1.5 / globalScale
+        ctx.strokeStyle = '#2F6F86'
+        ctx.beginPath()
+        ctx.arc(x, y, r + 3 / globalScale, 0, 2 * Math.PI)
+        ctx.stroke()
+      }
       ctx.restore()
 
       // LOD labels: Task 8. Opacity only — the label position never changes, so
       // fading it in/out never shifts layout.
-      const isFocused = node.id === hoverId || node.id === selectedIdRef.current
+      const isFocused = node.id === hoverId || node.id === selectedIdRef.current || inAsk
       // Session labels only when hovered/selected; concept labels ramp by zoom.
       const lodAlpha =
         node.type === 'session'
@@ -290,7 +315,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
             : 0
           : labelOpacity(globalScale, degree, maxDegreeRef.current, isFocused)
       // Backgrounded nodes' labels dim with them (so only the focus set reads).
-      const labelAlpha = lodAlpha * (hovering ? nodeAlpha : 1)
+      const labelAlpha = lodAlpha * (hovering || asking ? nodeAlpha : 1)
       if (labelAlpha > 0.02) {
         const fontSize = 12 / globalScale // constant on-screen size (canvas is zoom-scaled)
         ctx.save()
@@ -369,10 +394,15 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   // Hover-aware link color (Task 7): incident edges bright (~0.8), others faint.
   const linkColorAccessor = useCallback((l: LinkObject<FNode, FLink>) => {
     const base = linkColor(l.relClass)
-    if (hoverIdRef.current === null) return base
-    return highlightLinksRef.current.has(l as unknown as FLink)
-      ? withAlpha(base, 0.8)
-      : withAlpha(base, 0.05)
+    if (hoverIdRef.current !== null) {
+      return highlightLinksRef.current.has(l as unknown as FLink) ? withAlpha(base, 0.8) : withAlpha(base, 0.05)
+    }
+    const askIds = askIdsRef.current
+    if (askIds && askIds.size) {
+      // Evidence subgraph: edges between two cited concepts stay bright, rest fade.
+      return askIds.has(endpointId(l.source)) && askIds.has(endpointId(l.target)) ? withAlpha(base, 0.85) : withAlpha(base, 0.05)
+    }
+    return base
   }, [])
 
   const handleNodeClick = useCallback(

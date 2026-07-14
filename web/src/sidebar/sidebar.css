@@ -302,6 +302,36 @@
   color: var(--sub);
 }
 
+/* ＋ 새 프로젝트 — catalog footer action (last row of the dropdown) */
+.projectswitcher__foot {
+  margin-top: var(--space-1);
+  border-top: 1px solid var(--rule);
+}
+.projectswitcher__new {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  transition: background var(--dur-ui) ease;
+}
+.projectswitcher__new:hover {
+  background: rgba(24, 23, 19, 0.05);
+}
+.projectswitcher__newplus {
+  color: var(--session-red);
+  font-size: 13px;
+  line-height: 1;
+}
+
 /* ============================================================
    SessionList — lecture slips
    ============================================================ */

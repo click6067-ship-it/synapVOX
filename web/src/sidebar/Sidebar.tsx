@@ -23,11 +23,22 @@ export function Sidebar(props: {
   collapsed: boolean
   onToggleCollapse(): void
   onSelectProject(p: string): void
+  onNewProject(): void
   onOpenUpload(): void
   onHoverSession(id: string | null): void
 }): JSX.Element {
-  const { project, projects, sessions, stats, collapsed, onToggleCollapse, onSelectProject, onOpenUpload, onHoverSession } =
-    props
+  const {
+    project,
+    projects,
+    sessions,
+    stats,
+    collapsed,
+    onToggleCollapse,
+    onSelectProject,
+    onNewProject,
+    onOpenUpload,
+    onHoverSession,
+  } = props
 
   return (
     <nav className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`} aria-label="아카이브">
@@ -56,7 +67,13 @@ export function Sidebar(props: {
       </header>
 
       <div className="sidebar__switch">
-        <ProjectSwitcher project={project} projects={projects} collapsed={collapsed} onSelectProject={onSelectProject} />
+        <ProjectSwitcher
+          project={project}
+          projects={projects}
+          collapsed={collapsed}
+          onSelectProject={onSelectProject}
+          onNewProject={onNewProject}
+        />
       </div>
 
       <button

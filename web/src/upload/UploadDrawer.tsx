@@ -1,11 +1,17 @@
-// UploadDrawer — "＋Add lecture" panel. A student pastes a lecture's text; on
-// submit we run the single ingest request and show calm, staged cold-start copy
-// (extraction → linking → growing) rather than a dead spinner, then keep the
-// drawer open with a "새 세션 보기" action so they can jump to the freshly grown
-// graph. Archive Graph Studio aesthetic: paper chrome, ink borders, --r-1, no
+// UploadDrawer — "＋Add lecture" / "＋New project" panel. A student pastes a
+// lecture's text; on submit we run the single ingest request and show calm,
+// staged cold-start copy (extraction → linking → growing) rather than a dead
+// spinner, then keep the drawer open with a "새 세션 보기" action so they can jump
+// to the freshly grown graph. Two modes:
+//   'add' (default) — ingest into the currently open project.
+//   'new'           — an extra "프로젝트 이름" field appears; the lecture seeds a
+//                     brand-new project whose group_id is slugify(name), and the
+//                     caller (GraphPage) navigates there on success.
+// Archive Graph Studio aesthetic: paper chrome, ink borders, --r-1, no
 // celebratory animation (spec §6 — the graph's Growth Ring is the moment).
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
+import { slugify } from '../home/slug'
 import { useIngest } from './useIngest'
 import type { IngestStage } from './useIngest'
 import './upload.css'
@@ -31,24 +37,36 @@ const STEPS: { key: 'extracting' | 'linking' | 'growing'; short: string }[] = [
 export function UploadDrawer(props: {
   project: string
   open: boolean
+  mode?: 'add' | 'new'
   onClose: () => void
-  onIngested: (title: string) => void
+  onIngested: (project: string, title: string) => void
 }): JSX.Element | null {
-  const { project, open, onClose, onIngested } = props
+  const { project, open, mode = 'add', onClose, onIngested } = props
   const { stage, error, submit, reset } = useIngest(project, onIngested)
 
+  const isNew = mode === 'new'
+  const [name, setName] = useState('')
   const [title, setTitle] = useState('')
   const [text, setText] = useState('')
 
   const busy = stage === 'extracting' || stage === 'linking' || stage === 'growing'
   const done = stage === 'done'
   const over = text.length > MAX_CHARS
-  const canSubmit = !busy && title.trim().length > 0 && text.trim().length > 0 && !over
+  // 'new' mode additionally requires a (non-blank) project name.
+  const canSubmit =
+    !busy && title.trim().length > 0 && text.trim().length > 0 && !over && (!isNew || name.trim().length > 0)
+
+  // Mode-aware copy — the flow (paste → cold-start rail → grow) is identical.
+  const heading = isNew ? '새 프로젝트' : '강의 추가'
+  const ctaIdle = isNew ? '프로젝트 만들기' : '그래프에 추가'
+  const ctaBusy = isNew ? '만드는 중…' : '추가하는 중…'
+  const doneCopy = isNew ? '새 프로젝트가 만들어졌어요.' : '새 강의가 그래프에 흡수됐어요.'
 
   // Reopening after a completed upload starts fresh. In-progress / error text is
   // preserved across a manual close so a retry keeps the student's paste.
   useEffect(() => {
     if (open && stage === 'done') {
+      setName('')
       setTitle('')
       setText('')
       reset()
@@ -62,11 +80,14 @@ export function UploadDrawer(props: {
   const handleSubmit = (e: { preventDefault: () => void }) => {
     e.preventDefault()
     if (!canSubmit) return
-    submit(title.trim(), text)
+    // 'new' mode: derive a fresh, backend-safe group_id from the name and ingest
+    // there. 'add' mode: no target → the hook uses the current project.
+    submit(title.trim(), text, isNew ? slugify(name.trim()) : undefined)
   }
 
   // Done → "새 세션 보기": clear the form, reset the machine, hand off to close.
   const handleView = () => {
+    setName('')
     setTitle('')
     setText('')
     reset()
@@ -76,21 +97,39 @@ export function UploadDrawer(props: {
   const stepIndex = STEPS.findIndex((s) => s.key === stage)
 
   return (
-    <div className="upload" role="dialog" aria-modal="true" aria-label="강의 추가">
+    <div className="upload" role="dialog" aria-modal="true" aria-label={heading}>
       {/* Backdrop — dismiss when idle; during an in-flight ingest it stays put. */}
       <div className="upload__backdrop" onClick={busy ? undefined : onClose} aria-hidden="true" />
 
       <aside className="upload__panel">
         <header className="upload__head">
-          <h2 className="upload__title">강의 추가</h2>
+          <h2 className="upload__title">{heading}</h2>
           <button type="button" className="upload__close" onClick={onClose} aria-label="닫기">
             ×
           </button>
         </header>
 
         <form className="upload__form" onSubmit={handleSubmit}>
-          <label className="upload__label" htmlFor="upload-title">
-            제목
+          {isNew && (
+            <>
+              <label className="upload__label" htmlFor="upload-name">
+                프로젝트 이름
+              </label>
+              <input
+                id="upload-name"
+                className="upload__input"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 세포생물학"
+                disabled={busy || done}
+                autoComplete="off"
+              />
+            </>
+          )}
+
+          <label className={`upload__label${isNew ? ' upload__label--spaced' : ''}`} htmlFor="upload-title">
+            {isNew ? '첫 강의 제목' : '제목'}
           </label>
           <input
             id="upload-title"
@@ -154,18 +193,18 @@ export function UploadDrawer(props: {
 
           {done && (
             <p className="upload__donecopy" role="status">
-              새 강의가 그래프에 흡수됐어요.
+              {doneCopy}
             </p>
           )}
 
           <footer className="upload__foot">
             {done ? (
               <button type="button" className="upload__cta" onClick={handleView}>
-                새 세션 보기
+                {isNew ? '새 그래프 보기' : '새 세션 보기'}
               </button>
             ) : (
               <button type="submit" className="upload__cta" disabled={!canSubmit}>
-                {busy ? '추가하는 중…' : '그래프에 추가'}
+                {busy ? ctaBusy : ctaIdle}
               </button>
             )}
           </footer>

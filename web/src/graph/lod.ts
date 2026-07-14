@@ -16,6 +16,10 @@ export const LOW_SCALE = 0.7
 export const HIGH_SCALE = 2.4
 export const HUB_FRACTION = 0.6
 export const HUB_FLOOR = 0.6
+// How much later a leaf (degree 0) reveals its label vs a max-hub, as a fraction
+// of the LOW..HIGH window. Higher = the fit-view shows mostly hubs (less clutter),
+// and zooming in progressively reveals the rest (Obsidian-like).
+export const REVEAL_SPREAD = 0.85
 
 function clamp01(v: number): number {
   if (Number.isNaN(v)) return 0
@@ -42,11 +46,15 @@ export function labelOpacity(
   const hubFrac = clamp01(degree / md)
   const isHub = hubFrac >= HUB_FRACTION
 
-  // Base zoom ramp: 0 at LOW_SCALE, 1 at HIGH_SCALE, applied to every node.
-  const baseRamp = clamp01((globalScale - LOW_SCALE) / (HIGH_SCALE - LOW_SCALE))
+  // Degree-weighted reveal: a max-hub's label ramps from LOW_SCALE; a leaf's
+  // ramp only starts once zoomed further in. This keeps the zoomed-out fit-view
+  // uncluttered (mostly hubs) while zooming in reveals the rest — 0 at its start
+  // scale, 1 at HIGH_SCALE.
+  const startScale = LOW_SCALE + (1 - hubFrac) * (HIGH_SCALE - LOW_SCALE) * REVEAL_SPREAD
+  const ramp = HIGH_SCALE > startScale ? clamp01((globalScale - startScale) / (HIGH_SCALE - startScale)) : 0
 
-  // Hub floor: the biggest hubs stay partially visible even below LOW_SCALE.
+  // Hub floor: the biggest hubs stay partially visible even below their start.
   const hubFloor = isHub ? hubFrac * HUB_FLOOR : 0
 
-  return clamp01(Math.max(baseRamp, hubFloor))
+  return clamp01(Math.max(ramp, hubFloor))
 }

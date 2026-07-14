@@ -99,6 +99,11 @@
   color: var(--sub);
 }
 
+/* Title label when it trails the "프로젝트 이름" field (new-project mode). */
+.upload__label--spaced {
+  margin-top: var(--space-3);
+}
+
 .upload__labelrow {
   display: flex;
   align-items: baseline;
