@@ -17,9 +17,13 @@ STATIC = Path(__file__).parent.parent / "static"
 _PROJECT_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
-def create_app(engine, corpus, key_map, cors_origins, readonly=False):
+def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_reset=False):
     """readonly=True 면 쓰기(ingest/reset)를 막는다 — 사전 시드된 그래프만 조회하는
-    공개 배포용(익명 사용자가 비싼 LLM 추출을 못 돌리게 비용/남용 방어)."""
+    공개 배포용(익명 사용자가 비싼 LLM 추출을 못 돌리게 비용/남용 방어).
+
+    allow_reset=False(기본)면 /reset은 readonly 여부와 무관하게 항상 403 —
+    home create flow용으로 SVX_READONLY=0을 켠 공개 데모에서도 /reset(그룹 전체
+    DETACH-DELETE)만은 별도로 꺼져 있어야 한다(SVX_ALLOW_RESET로만 명시적 활성화)."""
 
     @asynccontextmanager
     async def lifespan(app):
@@ -47,6 +51,10 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
     def _guard_write():
         if readonly:
             raise HTTPException(403, "읽기 전용 배포입니다 — 사전 시드된 그래프만 조회할 수 있습니다.")
+
+    def _guard_reset():
+        if readonly or not allow_reset:
+            raise HTTPException(403, "reset은 이 배포에서 비활성화되어 있습니다.")
 
     def _resolve_project(raw: str | None, default: str) -> str:
         """ingest-text/reset — body의 project(있으면)를 쿼리/기본값보다 우선."""
@@ -104,7 +112,7 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
 
     @app.post("/reset")
     async def reset(body: dict | None = None, pid: str = Depends(project_id)):
-        _guard_write()
+        _guard_reset()
         project = _resolve_project((body or {}).get("project"), pid)
         await engine.reset(project)
         return {"ok": True}

@@ -42,6 +42,10 @@ key_map = {hashlib.sha256(KEY.encode()).hexdigest(): PROJECT}
 
 # SVX_READONLY=1 이면 쓰기(ingest/reset) 차단 — 사전 시드된 그래프만 조회하는 공개 배포용.
 READONLY = os.environ.get("SVX_READONLY", "").strip() in ("1", "true", "yes")
+# SVX_ALLOW_RESET=1 일 때만 /reset 활성화(기본 off) — SVX_READONLY=0(홈 생성 플로우용)이어도
+# 공개 데모 키로 그룹 전체를 지우는 /reset은 별도로 막아야 한다.
+ALLOW_RESET = os.environ.get("SVX_ALLOW_RESET", "").strip() in ("1", "true", "yes")
 
 engine = GraphitiEngine()
-app = create_app(engine, corpus, key_map, os.environ.get("DEMO_CORS", "*").split(","), readonly=READONLY)
+app = create_app(engine, corpus, key_map, os.environ.get("DEMO_CORS", "*").split(","),
+                  readonly=READONLY, allow_reset=ALLOW_RESET)

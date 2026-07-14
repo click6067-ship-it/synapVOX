@@ -50,9 +50,9 @@ class StubEngine:
         return {"nodes": [], "edges": []}
 
 
-def _client(readonly):
+def _client(readonly, allow_reset=False):
     engine = StubEngine()
-    app = create_app(engine, CORPUS, KEY_MAP, ["*"], readonly=readonly)
+    app = create_app(engine, CORPUS, KEY_MAP, ["*"], readonly=readonly, allow_reset=allow_reset)
     return TestClient(app), engine
 
 
@@ -123,3 +123,19 @@ def test_invalid_project_id_returns_400():
     r = client.get("/graph?project=bad!id", headers=h())
     assert r.status_code == 400
     assert r.json()["detail"] == "invalid project id"
+
+
+def test_reset_blocked_by_default_even_when_writable():
+    # readonly=False(쓰기 가능한 배포)여도 allow_reset이 기본값(False)이면 /reset은 403 —
+    # 공개 데모 키로 그룹 전체를 지우는 것을 막는 별도 게이트.
+    client, engine = _client(readonly=False, allow_reset=False)
+    r = client.post("/reset", headers=h())
+    assert r.status_code == 403
+    assert engine.reset_called is False
+
+
+def test_reset_allowed_when_flag_set():
+    client, engine = _client(readonly=False, allow_reset=True)
+    r = client.post("/reset", headers=h())
+    assert r.status_code == 200
+    assert engine.reset_called is True
