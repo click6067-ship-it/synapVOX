@@ -80,14 +80,21 @@
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   color: var(--ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
 }
 .source-card:hover {
   background: var(--surface-2);
   border-color: var(--accent-sess);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -14px rgba(0, 0, 0, 0.7), 0 0 18px -10px rgba(124, 140, 240, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.source-card:active {
+  transform: translateY(-1px);
 }
 .source-card--active {
   border-color: var(--accent-sess);
@@ -142,10 +149,14 @@
   font: inherit;
   font-size: 12.5px;
   cursor: pointer;
+  transition: border-color 0.14s ease, color 0.14s ease, background 0.14s ease, transform 0.1s ease;
 }
 .ws-chip:hover {
   border-color: var(--accent-conc);
   color: var(--ink);
+}
+.ws-chip:active {
+  transform: scale(0.96);
 }
 .ws-chip--on {
   background: rgba(63, 185, 160, 0.14);
@@ -406,10 +417,58 @@
   background: var(--accent-conc);
   color: #06231d;
   cursor: pointer;
+  transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+.chat-input-send:hover:not(:disabled) {
+  filter: brightness(1.08);
+  box-shadow: 0 0 16px -5px rgba(63, 185, 160, 0.7);
+}
+.chat-input-send:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .chat-input-send:disabled {
   opacity: 0.4;
   cursor: default;
+}
+
+/* ---- entrance: columns fade in (opacity only — no transform, so it never
+   creates a containing block that would disturb the absolute graph stage) ---- */
+@keyframes ws-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.ws-col {
+  animation: ws-fade-in 0.34s ease both;
+}
+.ws-col--center {
+  animation-delay: 0s;
+}
+.ws-col--left {
+  animation-delay: 0.06s;
+}
+.ws-col--right {
+  animation-delay: 0.11s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ws-col {
+    animation: none;
+  }
+  .source-card,
+  .ws-chip,
+  .chat-input-send {
+    transition: none;
+  }
+  .source-card:hover,
+  .source-card:active,
+  .ws-chip:active,
+  .chat-input-send:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 /* ============ narrow: stack columns ============ */

@@ -6,10 +6,12 @@ import type { GraphNode } from '../graph/mapGraph'
 type Props = {
   sessions: GraphNode[]
   onSelectSource: (id: string) => void
+  // Transient hover → highlight this session (and its concepts) in the graph.
+  onHoverSource?: (id: string | null) => void
   selectedId?: string | null
 }
 
-function SourcesPanel({ sessions, onSelectSource, selectedId }: Props) {
+function SourcesPanel({ sessions, onSelectSource, onHoverSource, selectedId }: Props) {
   const ordered = [...sessions].sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
 
   return (
@@ -32,6 +34,8 @@ function SourcesPanel({ sessions, onSelectSource, selectedId }: Props) {
                   type="button"
                   className={`source-card${active ? ' source-card--active' : ''}`}
                   onClick={() => onSelectSource(s.id)}
+                  onPointerEnter={() => onHoverSource?.(s.id)}
+                  onPointerLeave={() => onHoverSource?.(null)}
                   aria-pressed={active}
                 >
                   <span className="source-seq">{seq}</span>

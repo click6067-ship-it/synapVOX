@@ -75,6 +75,7 @@ body,
 }
 
 .drawer-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -91,16 +92,56 @@ body,
   overflow: hidden;
   width: 100%;
   text-align: left;
+  transition: background 0.14s ease, color 0.14s ease;
 }
 .drawer-item:hover {
   background: var(--surface-2);
   color: var(--ink);
+}
+/* active-route indicator: an accent bar on the leading edge */
+.drawer-item.active {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.drawer-item:not(.drawer-item--placeholder)::before {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%) scaleY(0);
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--accent-conc);
+  opacity: 0;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+.drawer-item:not(.drawer-item--placeholder):hover::before {
+  transform: translateY(-50%) scaleY(1);
+  opacity: 0.5;
+}
+.drawer-item.active::before {
+  transform: translateY(-50%) scaleY(1);
+  opacity: 1;
 }
 .drawer-item-icon {
   display: inline-flex;
   flex: 0 0 auto;
   width: 18px;
   justify-content: center;
+  transition: color 0.14s ease;
+}
+.drawer-item:not(.drawer-item--placeholder):hover .drawer-item-icon,
+.drawer-item.active .drawer-item-icon {
+  color: var(--accent-conc);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-item,
+  .drawer-item::before,
+  .drawer-item-icon {
+    transition: none;
+  }
 }
 .drawer-item--placeholder {
   cursor: default;

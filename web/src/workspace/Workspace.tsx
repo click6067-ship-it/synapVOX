@@ -35,6 +35,10 @@ function Workspace() {
   const [sessions, setSessions] = useState<GraphNode[]>([])
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
+  // Drives the imperative neighbor-highlight in GraphCanvas from the sources
+  // panel: hovering a source is transient, clicking pins it. hover wins.
+  const [hoverSource, setHoverSource] = useState<string | null>(null)
+  const [pinnedSource, setPinnedSource] = useState<string | null>(null)
 
   // "텍스트로 추가" inline composer
   const [addOpen, setAddOpen] = useState(false)
@@ -48,6 +52,15 @@ function Workspace() {
   const handleSelectSource = (id: string) => {
     const node = sessions.find((s) => s.id === id)
     if (node) setSelectedNode(node)
+    setPinnedSource(id) // keep this session highlighted in the graph
+  }
+
+  // Clicking a node inside the graph takes over: clear any source-driven
+  // highlight so the graph's own selection highlight shows.
+  const handleSelectNode = (node: GraphNode) => {
+    setSelectedNode(node)
+    setPinnedSource(null)
+    setHoverSource(null)
   }
 
   const handleAdd = async () => {
@@ -71,7 +84,12 @@ function Workspace() {
   return (
     <div className="workspace">
       <aside className="ws-col ws-col--left">
-        <SourcesPanel sessions={sessions} onSelectSource={handleSelectSource} selectedId={selectedNode?.id ?? null} />
+        <SourcesPanel
+          sessions={sessions}
+          onSelectSource={handleSelectSource}
+          onHoverSource={setHoverSource}
+          selectedId={selectedNode?.id ?? null}
+        />
       </aside>
 
       <section className="ws-col ws-col--center">
@@ -131,8 +149,9 @@ function Workspace() {
             project={project}
             filter={filter}
             reloadKey={reloadKey}
+            highlightId={hoverSource ?? pinnedSource}
             onGraphLoad={(nodes) => setSessions(nodes.filter((n) => n.type === 'session'))}
-            onSelectNode={setSelectedNode}
+            onSelectNode={handleSelectNode}
           />
         </div>
 

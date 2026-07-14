@@ -1,6 +1,6 @@
 // Persistent left drawer nav (Daglo-style: dark, icon+label, collapsible, off-canvas on narrow screens).
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
 
 /** Small inline-SVG icon set — no external icon library/CDN. */
 function IconGraphMark() {
@@ -106,18 +106,30 @@ function Drawer() {
         </div>
 
         <nav className="drawer-nav">
-          <Link to="/" className="drawer-item" onClick={closeMobile} title={collapsed ? '새 그래프' : undefined}>
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) => `drawer-item${isActive ? ' active' : ''}`}
+            onClick={closeMobile}
+            title={collapsed ? '새 그래프' : undefined}
+          >
             <span className="drawer-item-icon">
               <IconPlusGraph />
             </span>
             {!collapsed && <span className="drawer-item-label">새 그래프</span>}
-          </Link>
-          <Link to="/" className="drawer-item" onClick={closeMobile} title={collapsed ? '내 프로젝트' : undefined}>
+          </NavLink>
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) => `drawer-item${isActive ? ' active' : ''}`}
+            onClick={closeMobile}
+            title={collapsed ? '내 프로젝트' : undefined}
+          >
             <span className="drawer-item-icon">
               <IconProjects />
             </span>
             {!collapsed && <span className="drawer-item-label">내 프로젝트</span>}
-          </Link>
+          </NavLink>
           <button
             type="button"
             className="drawer-item drawer-item--placeholder"

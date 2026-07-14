@@ -30,6 +30,9 @@ type Props = {
   onGraphLoad?: (nodes: GraphNode[]) => void
   // Bump to force a re-fetch of the graph (e.g. after ingesting new text).
   reloadKey?: number | string
+  // Externally-driven neighbor highlight (e.g. hovering/clicking a source in the
+  // left panel). Applied imperatively — it does NOT re-run the physics sim.
+  highlightId?: string | null
 }
 
 type Viewport = { x: number; y: number; scale: number }
@@ -75,7 +78,7 @@ function markerFor(rc: RelClass): string | undefined {
   return undefined
 }
 
-export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad, reloadKey }: Props) {
+export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad, reloadKey, highlightId }: Props) {
   const [graph, setGraph] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -104,6 +107,23 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
   const viewportRef = useRef<Viewport>({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef<{ id: string; moved: boolean; sx: number; sy: number } | null>(null)
   const panRef = useRef<{ vbX: number; vbY: number; vx: number; vy: number; moved: boolean } | null>(null)
+
+  // --- neighbor-highlight (imperative, no re-render) ---
+  // id -> Set of directly-connected neighbor ids, precomputed on graph load so
+  // hover/highlight is O(neighbors), not O(links). Degree drives the tooltip.
+  const adjacencyRef = useRef<Map<string, Set<string>>>(new Map())
+  // Which node the pointer is currently over (transient), the clicked/selected
+  // node (sticky), and the externally-driven highlight (source panel). The
+  // effective highlight = hover ?? external ?? selected. All refs so toggling
+  // them never triggers a React re-render of the node/edge lists.
+  const hoverIdRef = useRef<string | null>(null)
+  const selectedIdRef = useRef<string | null>(null)
+  const highlightIdRef = useRef<string | null>(null)
+  // Floating tooltip elements (updated imperatively on hover).
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const tipRef = useRef<HTMLDivElement | null>(null)
+  const tipLabelRef = useRef<HTMLSpanElement | null>(null)
+  const tipMetaRef = useRef<HTMLSpanElement | null>(null)
 
   // Imperatively push viewportRef.current onto the stage <g>'s transform.
   const applyViewport = useCallback(() => {
@@ -165,6 +185,80 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
     })
   }, [])
 
+  // --- imperative neighbor-highlight (never re-renders the node/edge lists) ---
+  // Effective focus = hover (transient) ?? external highlight (source panel) ??
+  // selected (clicked, sticky). Toggles `.hl`/`.dim` classes directly on the DOM
+  // elements held in nodeElRef/edgeElRef. Re-applied after every structural
+  // render (see layout effect) because React overwrites className on the nodes
+  // whose className prop actually changed (e.g. the newly-selected one).
+  const applyHighlight = useCallback(() => {
+    const focus = hoverIdRef.current ?? highlightIdRef.current ?? selectedIdRef.current
+    const svg = svgRef.current
+    if (!focus) {
+      svg?.classList.remove('is-highlighting')
+      nodeElRef.current.forEach((el) => el.classList.remove('hl', 'dim'))
+      edgeElRef.current.forEach((edge) => edge.el.classList.remove('hl', 'dim'))
+      return
+    }
+    const neighbors = adjacencyRef.current.get(focus)
+    const active = new Set<string>([focus])
+    if (neighbors) neighbors.forEach((id) => active.add(id))
+    svg?.classList.add('is-highlighting')
+    nodeElRef.current.forEach((el, id) => {
+      if (active.has(id)) {
+        el.classList.add('hl')
+        el.classList.remove('dim')
+      } else {
+        el.classList.add('dim')
+        el.classList.remove('hl')
+      }
+    })
+    edgeElRef.current.forEach((edge) => {
+      // Highlight edges incident to the focused node; dim the rest.
+      if (edge.from === focus || edge.to === focus) {
+        edge.el.classList.add('hl')
+        edge.el.classList.remove('dim')
+      } else {
+        edge.el.classList.add('dim')
+        edge.el.classList.remove('hl')
+      }
+    })
+  }, [])
+
+  // --- floating tooltip (imperative; positioned relative to the wrapper) ---
+  const showTooltip = useCallback((node: GraphNode, clientX: number, clientY: number) => {
+    const tip = tipRef.current
+    if (!tip) return
+    const deg = adjacencyRef.current.get(node.id)?.size ?? 0
+    if (tipLabelRef.current) tipLabelRef.current.textContent = node.label
+    if (tipMetaRef.current) {
+      if (node.type === 'session') {
+        tipMetaRef.current.textContent = `강의 세션 · 개념 ${deg}개`
+      } else {
+        tipMetaRef.current.textContent = `${node.bridge ? '브리지 개념' : '개념'} · 연결 ${deg}`
+      }
+    }
+    tip.classList.add('is-on')
+    moveTooltip(clientX, clientY)
+  }, [])
+
+  const moveTooltip = (clientX: number, clientY: number) => {
+    const tip = tipRef.current
+    const wrap = wrapperRef.current
+    if (!tip || !wrap) return
+    const r = wrap.getBoundingClientRect()
+    let x = clientX - r.left + 14
+    let y = clientY - r.top + 14
+    // keep the tooltip inside the wrapper
+    x = Math.min(x, r.width - tip.offsetWidth - 8)
+    y = Math.min(y, r.height - tip.offsetHeight - 8)
+    tip.style.transform = `translate(${Math.max(6, x)}px, ${Math.max(6, y)}px)`
+  }
+
+  const hideTooltip = useCallback(() => {
+    tipRef.current?.classList.remove('is-on')
+  }, [])
+
   // --- load graph on project change ---
   useEffect(() => {
     let cancelled = false
@@ -172,6 +266,9 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
     edgeElRef.current.clear()
     nodeRefCacheRef.current.clear()
     edgeRefCacheRef.current.clear()
+    adjacencyRef.current = new Map()
+    hoverIdRef.current = null
+    selectedIdRef.current = null
     setGraph(null)
     setSelectedId(null)
 
@@ -179,6 +276,16 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
       .then((raw) => {
         if (cancelled) return
         const g = mapGraph(raw)
+        // Precompute adjacency (id -> neighbor ids) + a node lookup for tooltips.
+        const adj = new Map<string, Set<string>>()
+        const addAdj = (a: string, b: string) => {
+          ;(adj.get(a) ?? adj.set(a, new Set()).get(a)!).add(b)
+        }
+        for (const l of g.links) {
+          addAdj(l.from, l.to)
+          addAdj(l.to, l.from)
+        }
+        adjacencyRef.current = adj
         const simNodes = buildSimNodes(g)
         const idx: Record<string, number> = {}
         simNodes.forEach((n, i) => (idx[n.id] = i))
@@ -212,7 +319,13 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
   useLayoutEffect(() => {
     syncPositions()
     applyViewport()
-  }, [graph, filter, syncPositions, applyViewport])
+    // Keep the sticky-highlight refs in sync with React state/props, then
+    // re-apply the highlight — a structural render (select/filter) overwrites
+    // className on the changed nodes, wiping their imperative .hl/.dim classes.
+    selectedIdRef.current = selectedId
+    highlightIdRef.current = highlightId ?? null
+    applyHighlight()
+  }, [graph, filter, selectedId, highlightId, syncPositions, applyViewport, applyHighlight])
 
   // Native, non-passive wheel listener so preventDefault works (zoom to cursor).
   useEffect(() => {
@@ -259,6 +372,7 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
     const s = simRef.current
     if (!s) return
     e.currentTarget.setPointerCapture?.(e.pointerId)
+    hideTooltip()
     const gp = pointerToGraph(e.clientX, e.clientY)
     const sn = s.sim.nodes[s.sim.idx[node.id]]
     if (sn) {
@@ -306,9 +420,27 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
       /* not captured */
     }
     if (d && !d.moved) {
+      selectedIdRef.current = node.id
       setSelectedId(node.id)
       onSelectNode?.(node)
     }
+  }
+
+  // --- node hover: imperative neighbor highlight + floating tooltip ---
+  const onNodeEnter = (e: RPointerEvent<SVGGElement>, node: GraphNode) => {
+    if (simRef.current?.drag) return // don't fight an in-progress drag
+    hoverIdRef.current = node.id
+    applyHighlight()
+    showTooltip(node, e.clientX, e.clientY)
+  }
+  const onNodeHoverMove = (e: RPointerEvent<SVGGElement>) => {
+    if (simRef.current?.drag) return
+    moveTooltip(e.clientX, e.clientY)
+  }
+  const onNodeLeave = () => {
+    hoverIdRef.current = null
+    applyHighlight()
+    hideTooltip()
   }
 
   // --- background pan / deselect ---
@@ -332,7 +464,10 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
   const onBgUp = (e: RPointerEvent<SVGSVGElement>) => {
     const p = panRef.current
     panRef.current = null
-    if (p && !p.moved) setSelectedId(null)
+    if (p && !p.moved) {
+      selectedIdRef.current = null
+      setSelectedId(null)
+    }
     try {
       e.currentTarget.releasePointerCapture?.(e.pointerId)
     } catch {
@@ -383,6 +518,7 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
   }
 
   return (
+    <div className="graph-stage" ref={wrapperRef}>
     <svg
       ref={svgRef}
       className="graph-canvas"
@@ -438,10 +574,15 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
               <g
                 key={node.id}
                 ref={getNodeRef(node.id)}
-                className={`node node-${node.type}${selected ? ' selected' : ''}`}
+                className={`node node-${node.type}${node.type === 'concept' && node.bridge ? ' node-bridge' : ''}${selected ? ' selected' : ''}`}
                 onPointerDown={(e) => onNodeDown(e, node)}
-                onPointerMove={(e) => onNodeMove(e, node)}
+                onPointerMove={(e) => {
+                  onNodeMove(e, node)
+                  onNodeHoverMove(e)
+                }}
                 onPointerUp={(e) => onNodeUp(e, node)}
+                onPointerEnter={(e) => onNodeEnter(e, node)}
+                onPointerLeave={onNodeLeave}
               >
                 {node.type === 'session' ? (
                   <>
@@ -466,5 +607,10 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
         </g>
       </g>
     </svg>
+      <div className="graph-tooltip" ref={tipRef} aria-hidden="true">
+        <span className="graph-tooltip-label" ref={tipLabelRef} />
+        <span className="graph-tooltip-meta" ref={tipMetaRef} />
+      </div>
+    </div>
   )
 }

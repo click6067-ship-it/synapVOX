@@ -1,10 +1,34 @@
 /* Dark force-graph styling. Colors pull from tokens.css. */
 
+/* Wrapper that hosts the svg + the floating tooltip. A faint dot-grid and a
+   radial vignette sit behind the (transparent) canvas so nodes appear to float. */
+.graph-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 50% 42%, rgba(63, 185, 160, 0.05), transparent 60%),
+    radial-gradient(rgba(154, 160, 176, 0.12) 1px, transparent 1.4px);
+  background-size: 100% 100%, 22px 22px;
+  background-position: center, center;
+}
+/* Radial vignette darkening the edges, layered on top of the grid. */
+.graph-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(8, 9, 12, 0.55) 100%);
+}
+
 .graph-canvas {
   display: block;
   width: 100%;
   height: 100%;
-  background: var(--bg);
+  position: relative;
+  z-index: 1;
+  background: transparent;
   touch-action: none; /* pointer-driven pan/zoom, no browser gestures */
   cursor: grab;
   user-select: none;
@@ -19,6 +43,7 @@
   stroke: var(--edge);
   stroke-width: 1;
   opacity: 0.5;
+  transition: opacity 0.22s ease, stroke-width 0.22s ease;
 }
 .edge-mentions {
   stroke: var(--edge);
@@ -56,26 +81,61 @@
 /* ---- nodes ---- */
 .node {
   cursor: pointer;
+  transition: opacity 0.22s ease;
 }
 .node-concept-dot {
   fill: var(--surface-2);
   stroke: var(--accent-conc);
   stroke-width: 1.5;
+  /* soft base glow so concepts read as lit points, not flat dots */
+  filter: drop-shadow(0 0 2.5px rgba(63, 185, 160, 0.45));
+  transition: filter 0.2s ease, stroke-width 0.2s ease;
+}
+/* bridge concepts (cross-session connectors) glow a bit stronger */
+.node-bridge .node-concept-dot {
+  filter: drop-shadow(0 0 4px rgba(63, 185, 160, 0.7));
 }
 .node-session-box {
   fill: var(--surface);
   stroke: var(--accent-sess);
   stroke-width: 1.5;
+  filter: drop-shadow(0 0 2.5px rgba(124, 140, 240, 0.4));
+  transition: filter 0.2s ease, stroke-width 0.2s ease;
 }
 
-/* selection glow via stroke (+ subtle drop-shadow) */
+/* ---- neighbor highlight (hover / source / selected) ----
+   Applied imperatively (classList) via nodeElRef/edgeElRef — never React state.
+   Two-class selectors so they win over the single-class edge/node rules. */
+.graph-canvas.is-highlighting .node.dim {
+  opacity: 0.16;
+}
+.graph-canvas.is-highlighting .edge.dim {
+  opacity: 0.06;
+}
+.node.hl .node-concept-dot {
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 6px rgba(63, 185, 160, 0.85));
+}
+.node.hl .node-session-box {
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 6px rgba(124, 140, 240, 0.8));
+}
+.edge.hl {
+  opacity: 0.95;
+  stroke-width: 2;
+}
+.edge-mentions.hl {
+  opacity: 0.7;
+}
+
+/* selection glow via stroke (+ stronger drop-shadow) */
 .node.selected .node-concept-dot {
   stroke-width: 3;
-  filter: drop-shadow(0 0 6px var(--accent-conc));
+  filter: drop-shadow(0 0 7px var(--accent-conc));
 }
 .node.selected .node-session-box {
   stroke-width: 3;
-  filter: drop-shadow(0 0 6px var(--accent-sess));
+  filter: drop-shadow(0 0 7px var(--accent-sess));
 }
 
 .node-seq {
@@ -90,6 +150,55 @@
   font-size: 10px;
   pointer-events: none;
 }
-.node.selected .node-label {
+.node.selected .node-label,
+.node.hl .node-label {
   fill: var(--ink);
+}
+
+/* ---- floating tooltip ---- */
+.graph-tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  max-width: 240px;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: rgba(22, 24, 31, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(0, 0);
+  transition: opacity 0.13s ease;
+  will-change: transform;
+}
+.graph-tooltip.is-on {
+  opacity: 1;
+}
+.graph-tooltip-label {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink);
+  font-weight: 600;
+  word-break: break-word;
+}
+.graph-tooltip-meta {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edge,
+  .node,
+  .node-concept-dot,
+  .node-session-box,
+  .graph-tooltip {
+    transition: none;
+  }
 }
