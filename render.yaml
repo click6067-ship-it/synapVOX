@@ -17,8 +17,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.12.3"
-      - key: SVX_READONLY          # 쿼리 전용 — ingest/reset 차단
-        value: "1"
+      - key: SVX_READONLY          # 0 = 쓰기 허용(공개 데모, 다른 사람도 추가 가능). 1 = 조회 전용.
+        value: "0"
       - key: NEO4J_USER
         value: neo4j
       - key: DEMO_API_KEY          # 프론트 X-API-Key (공개 데모 키)
