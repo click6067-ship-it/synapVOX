@@ -42,6 +42,10 @@ class StubEngine:
     async def list_projects(self):
         return [{"project": "P-BIO", "sessions": 2, "concepts": 5}]
 
+    async def graph(self, pid):
+        self.last_project = pid
+        return {"nodes": [], "edges": []}
+
 
 def _client(readonly):
     engine = StubEngine()
@@ -94,3 +98,11 @@ def test_projects_endpoint():
     r = client.get("/projects", headers=h())
     assert r.status_code == 200
     assert r.json()["projects"][0]["project"] == "P-BIO"
+
+
+def test_graph_uses_project_param():
+    eng = StubEngine()
+    app = create_app(eng, CORPUS, KEY_MAP, ["*"], readonly=False)
+    with TestClient(app) as c:
+        c.get("/graph?project=P-DL", headers={"X-API-Key": "demo-bio"})
+    assert eng.last_project == "P-DL"
