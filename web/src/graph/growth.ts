@@ -31,6 +31,17 @@ function endpointId(end: unknown): string {
   return typeof end === 'object' && end !== null ? String((end as { id: unknown }).id) : String(end)
 }
 
+// Deterministic per-id hash (FNV-1a) → stable jitter, so growth placement is
+// reproducible (no Math.random) and visual/test regressions are repeatable.
+function hashId(id: string): number {
+  let h = 2166136261
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
 function graphCentroid(nodes: FNode[]): { x: number; y: number } {
   let sx = 0
   let sy = 0
@@ -132,8 +143,9 @@ export function mergeSubgraph(
     const base = anchor ?? centroid
     const bx = Number.isFinite(base.x) ? (base.x as number) : 0
     const by = Number.isFinite(base.y) ? (base.y as number) : 0
-    node.x = bx + (Math.random() - 0.5) * 2 * ANCHOR_JITTER
-    node.y = by + (Math.random() - 0.5) * 2 * ANCHOR_JITTER
+    const h = hashId(node.id)
+    node.x = bx + ((h & 0xffff) / 0xffff - 0.5) * 2 * ANCHOR_JITTER
+    node.y = by + (((h >>> 16) & 0xffff) / 0xffff - 0.5) * 2 * ANCHOR_JITTER
     if (!anchorId && anchor) anchorId = anchor.id
   }
 
