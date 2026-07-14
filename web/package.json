@@ -10,8 +10,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "@fontsource-variable/jetbrains-mono": "^5.2.8",
+    "@fontsource/atkinson-hyperlegible": "^5.2.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-force-graph-2d": "^1.29.1",
     "react-router-dom": "^7.0.0"
   },
   "devDependencies": {
