@@ -241,6 +241,11 @@
   .node-session text{fill:#fff; stroke:var(--sess-dk); stroke-width:2.5px; font-weight:600}
   .node-concept circle{fill:var(--conc-soft); stroke:var(--conc); stroke-width:1.6}
   .node-concept.stop circle{stroke-dasharray:2 2; opacity:.6}
+  /* 시각 계층: 다리 개념(여러 세션 공유)=진하고 굵게, 잎 개념(단일 세션)=흐린 작은 점 */
+  .node-concept.leaf circle{opacity:.4; stroke-width:1.1}
+  .node-concept.leaf:hover circle{opacity:.85}
+  .node-concept.bridge circle{stroke-width:2.4}
+  .node-concept.bridge text{font-weight:600; fill:var(--conc-dk)}
   .node.sel rect,.node.sel circle{stroke-width:3}
   .node.sel circle{stroke:var(--conc-dk)}
   .dim{opacity:.1; transition:opacity .3s}
@@ -421,6 +426,7 @@
           <label><input type="checkbox" data-f="cooccur" checked><span class="sw" style="border-top-color:var(--e-cooccur)"></span>동시출현</label>
           <label><input type="checkbox" data-f="next" checked><span class="sw" style="border-top-color:var(--e-next)"></span>다음 세션</label>
           <label><input type="checkbox" data-f="semantic" checked><span class="sw" style="border-top-color:var(--e-continues)"></span>연속·확장</label>
+          <label style="margin-left:2px"><input type="checkbox" id="coreOnly">핵심 개념만</label>
           <label style="margin-left:2px"><input type="checkbox" id="sessOnly">세션↔세션만 보기</label>
         </div>
         <span class="spacer"></span>
@@ -787,7 +793,7 @@ const DIRECTED = { next: "url(#arrow-next)", continues: "url(#arrow-continues)",
 
 let gNodes = [], gEdges = [], nodeById = {};
 let W = 800, H = 600, alpha = 0, raf = null;
-const filterState = { mentions: true, cooccur: true, next: true, semantic: true, sessOnly: false };
+const filterState = { mentions: true, cooccur: true, next: true, semantic: true, sessOnly: false, coreOnly: false };
 let highlightSet = null;   // Set of node ids to spotlight (from search expansion)
 let timelineMode = false;  // "세션↔세션만 보기" = deterministic timeline layout (not force)
 
@@ -828,9 +834,17 @@ function buildGraph(data) {
   $("#graphEmpty").style.display = rawNodes.length ? "none" : "flex";
   $("#legend").style.display = rawNodes.length ? "block" : "none";
 
-  // degree for concept sizing
-  const deg = {};
-  rawEdges.forEach(e => { deg[e.src] = (deg[e.src] || 0) + 1; deg[e.dst] = (deg[e.dst] || 0) + 1; });
+  // bridge metric: 각 개념이 몇 개 '세션'에서 mention 되는가(=세션 가로지르기).
+  // sessDeg>=2 = 다리 개념(데모의 핵심 스토리) → 크게·라벨·진하게.
+  // sessDeg<=1 = 잎 개념(단일 세션 세부) → 작게·흐리게·라벨 숨김(150노드 라벨 겹침 해소).
+  const typeById = {}; rawNodes.forEach(n => typeById[n.id] = n.type);
+  const sessOf = {};
+  rawEdges.forEach(e => {
+    if ((REL_CLASS[e.rel_type] || "") !== "mentions") return;
+    const concept = typeById[e.src] === "concept" ? e.src : e.dst;
+    const sess = typeById[e.src] === "session" ? e.src : e.dst;
+    (sessOf[concept] = sessOf[concept] || new Set()).add(sess);
+  });
 
   const sessSorted = rawNodes.filter(n => n.type === "session")
     .sort((a, b) => ((a.meta && a.meta.seq) || 0) - ((b.meta && b.meta.seq) || 0));
@@ -848,14 +862,18 @@ function buildGraph(data) {
       x = cx + (Math.random() * 240 - 120);
       y = cy + (Math.random() * 240 - 120);
     }
-    const d = deg[n.id] || 0;
+    const sessDeg = (sessOf[n.id] && sessOf[n.id].size) || 0;
+    const bridge = n.type === "concept" && sessDeg >= 2;
     return {
       id: n.id, type: n.type, label: n.label || n.id, meta: n.meta || {},
       x, y, vx: 0, vy: 0, fx: null, fy: null,
-      r: n.type === "session" ? 0 : Math.min(6 + d * 1.0, 14),
+      sessDeg, bridge,
+      // 다리 개념은 세션 수에 비례해 커지고, 잎 개념은 작은 점으로 균일.
+      r: n.type === "session" ? 0 : (bridge ? Math.min(7 + sessDeg * 2.4, 18) : 4.5),
       // sessions are high-degree hubs; a much larger charge makes them repel
       // each other hard instead of collapsing into one clump at the centre.
-      charge: n.type === "session" ? 7 : 1,
+      // bridges repel a bit more than leaves so they claim the centre between sessions.
+      charge: n.type === "session" ? 7 : (bridge ? 2.2 : 0.8),
       active: true,
     };
   });
@@ -885,9 +903,13 @@ function nodeMarkup(n, i) {
     </g>`;
   }
   const stop = n.meta && n.meta.stoplist ? " stop" : "";
-  return `<g class="node node-concept${stop}" data-n="${i}">
+  const kind = n.bridge ? " bridge" : " leaf";
+  // 다리 개념만 정적 라벨(잎은 hover 툴팁으로 확인 → 라벨 밀림 방지)
+  const label = n.bridge
+    ? `<text text-anchor="middle" y="${n.r + 12}">${esc(shortLabel(n.label, 14))}</text>` : "";
+  return `<g class="node node-concept${stop}${kind}" data-n="${i}">
     <circle r="${n.r}"></circle>
-    <text text-anchor="middle" y="${n.r + 12}">${esc(shortLabel(n.label, 14))}</text>
+    ${label}
   </g>`;
 }
 
@@ -930,10 +952,10 @@ function shortLabel(s, n) {
 
 /* ---- filters ------------------------------------------------------- */
 function applyFilters() {
-  const sessOnly = filterState.sessOnly;
+  const sessOnly = filterState.sessOnly, coreOnly = filterState.coreOnly;
   timelineMode = sessOnly;
-  // node active: sessions always; concepts only if not sessOnly
-  gNodes.forEach(n => { n.active = n.type === "session" ? true : !sessOnly; });
+  // node active: sessions always; concepts only if not sessOnly, and (under coreOnly) only bridges
+  gNodes.forEach(n => { n.active = n.type === "session" ? true : (!sessOnly && !(coreOnly && !n.bridge)); });
   gEdges.forEach(e => {
     const a = nodeById[e.src], b = nodeById[e.dst];
     // concepts are inactive under sessOnly, so any edge touching one auto-hides here
@@ -1015,6 +1037,10 @@ $$("#filters input[data-f]").forEach(inp =>
     filterState[inp.getAttribute("data-f")] = inp.checked;
     applyFilters();
   }));
+$("#coreOnly").addEventListener("change", e => {
+  filterState.coreOnly = e.target.checked;
+  applyFilters();
+});
 $("#sessOnly").addEventListener("change", e => {
   filterState.sessOnly = e.target.checked;
   $$('#filters label').forEach(l => {
