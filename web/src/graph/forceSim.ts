@@ -45,8 +45,6 @@ export function stepSim(sim: Sim, W: number, H: number): void {
   const n = nodes.length;
   const cx = W / 2;
   const cy = H / 2;
-  // alpha로 위치 이동을 스케일 → 알파가 식으며 움직임이 잦아들어 부드럽게 정착(ease to rest).
-  const alpha = sim.alpha;
 
   // 1) center gravity — pulls every node toward (cx, cy).
   for (let i = 0; i < n; i++) {
@@ -111,8 +109,8 @@ export function stepSim(sim: Sim, W: number, H: number): void {
     }
     node.vx *= DAMPING;
     node.vy *= DAMPING;
-    node.x += node.vx * alpha;
-    node.y += node.vy * alpha;
+    node.x += node.vx;
+    node.y += node.vy;
     if (node.x < 0) node.x = 0;
     else if (node.x > W) node.x = W;
     if (node.y < 0) node.y = 0;

@@ -293,6 +293,10 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
           .filter((l) => idx[l.from] !== undefined && idx[l.to] !== undefined)
           .map((l) => ({ a: idx[l.from], b: idx[l.to] }))
         simRef.current = { sim: initSim(simNodes, simLinks), raf: null, drag: null }
+        // 워밍업: 화면 밖에서 미리 퍼뜨리고 정착시켜, 화면엔 (거의) 정착된 상태로 뜨게 한다.
+        // → 로드 시 오래 출렁이지 않고 짧은 마무리 정착만 보인 뒤 멈춘다.
+        const warm = simRef.current.sim
+        for (let i = 0; i < 220; i++) stepSim(warm, W, H)
         setGraph(g)
         ensureLoop()
         onGraphLoadRef.current?.(g.nodes)
