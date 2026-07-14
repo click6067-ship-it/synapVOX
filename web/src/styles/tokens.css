@@ -1,13 +1,59 @@
-:root{
-  --bg:#0e0f13; --surface:#16181f; --surface-2:#1c1f28; --line:#272b36;
-  --ink:#e8eaf0; --sub:#9aa0b0; --faint:#6b7180;
-  --accent-conc:#3fb9a0;   /* 개념=청록 */
-  --accent-sess:#7c8cf0;   /* 세션=인디고 */
-  --edge:#3a4050; --danger:#e0674a;
-  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
-  --sans:'Pretendard',system-ui,'Apple SD Gothic Neo',sans-serif;
-  /* Radii vary by element role (not one blanket value): dense cards read
-     tighter, tactile tiles rounder, the hero input in between. */
-  --radius:14px; --radius-lg:18px; --radius-sm:11px; --shadow:0 8px 30px rgba(0,0,0,.4);
+/* Archive Graph Studio — design tokens + global reset.
+   Bright paper/notebook archive (chrome) around a deep dark-green knowledge
+   universe (graph canvas). Exact palette per spec §3. */
+
+:root {
+  /* Palette (6 core tokens) */
+  --paper: #F4F0E7;        /* sidebar / panel background */
+  --ink: #181713;          /* text · 제본선 (binding line) */
+  --canvas: #07120F;       /* graph canvas */
+  --node-core: #D8FF6A;    /* core concept node (lime) */
+  --session-red: #C84E3A;  /* session node · upload state */
+  --rule-blue: #2F6F86;    /* links · focus · selection */
+
+  /* Derived */
+  --sub: #5b574d;          /* muted ink (secondary text) */
+  --rule: #d9d2c4;         /* hairline on paper */
+  --rule-canvas: #16241f;  /* hairline on canvas */
+
+  /* Typography */
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-ui: 'Atkinson Hyperlegible', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+  /* Radius (only 0 · 4 · 8 — no rounded card look) */
+  --r-0: 0;
+  --r-1: 4px;
+  --r-2: 8px;
+
+  /* Spacing — 4pt scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  /* Motion */
+  --dur-ui: 150ms;
+
+  /* Chrome ↔ canvas boundary ("제본선") */
+  --bind: 2px solid var(--ink);
 }
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+
+/* Global reset */
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--paper);
+}
+button { font: inherit; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+  }
+}

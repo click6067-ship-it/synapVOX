@@ -1,0 +1,13 @@
+/* Self-hosted fonts (Archive Graph Studio) — via @fontsource, CSP-safe, no CDN.
+   CSS family names (exact): 'Fraunces Variable', 'Atkinson Hyperlegible',
+   'JetBrains Mono Variable'. */
+
+/* Fraunces — display (project name, big status, empty screens) */
+@import '@fontsource-variable/fraunces';
+
+/* Atkinson Hyperlegible — UI / body (student-readability first) */
+@import '@fontsource/atkinson-hyperlegible';        /* 400 */
+@import '@fontsource/atkinson-hyperlegible/700.css'; /* 700 */
+
+/* JetBrains Mono — numerals, ingest status, stats */
+@import '@fontsource-variable/jetbrains-mono';
