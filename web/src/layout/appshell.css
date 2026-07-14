@@ -1,0 +1,144 @@
+/* AppShell — the 3-zone "Archive Graph Studio" frame:
+   paper sidebar │ deep-green graph canvas (hero) │ paper detail drawer.
+   The chrome↔canvas boundary is the "제본선" (--bind: 2px solid ink) drawn on
+   the canvas column's left/right edges. Full viewport, no page scroll. */
+
+.appshell {
+  --sidebar-w: 280px;
+  --drawer-w: 0px;
+
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr var(--drawer-w);
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden; /* no page scroll; the graph handles its own pan/zoom */
+  transition: grid-template-columns var(--dur-ui) ease;
+}
+
+.appshell--sidebar-collapsed {
+  --sidebar-w: 64px;
+}
+
+.appshell--has-drawer {
+  --drawer-w: 360px;
+}
+
+/* --- Sidebar (paper chrome) --- */
+.appshell__sidebar {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* --- Canvas (the hero) --- */
+.appshell__canvas {
+  grid-column: 2;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--canvas);
+  /* 제본선: binding line between chrome and canvas */
+  border-left: var(--bind);
+  border-right: var(--bind);
+}
+
+/* --- Detail drawer (paper chrome) --- */
+.appshell__drawer {
+  grid-column: 3;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* --- Mobile-only affordances (hidden on desktop) --- */
+.appshell__hamburger {
+  display: none;
+}
+
+.appshell__backdrop {
+  display: none;
+}
+
+/* ============================================================
+   Responsive: below 900px the chrome leaves the grid flow.
+   Sidebar → off-canvas overlay (translateX). Drawer → bottom sheet.
+   Structure only; real content is injected via props.
+   ============================================================ */
+@media (max-width: 900px) {
+  .appshell {
+    grid-template-columns: 1fr;
+  }
+
+  .appshell__canvas {
+    grid-column: 1;
+    border-left: none;
+    border-right: none;
+  }
+
+  /* Sidebar becomes an off-canvas overlay, slid in by --mobile-open */
+  .appshell__sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 30;
+    border-right: var(--bind);
+    transform: translateX(-100%);
+    transition: transform var(--dur-ui) ease;
+  }
+
+  .appshell--mobile-open .appshell__sidebar {
+    transform: translateX(0);
+  }
+
+  /* Drawer becomes a bottom sheet, raised when a drawer is present */
+  .appshell__drawer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    height: 60vh;
+    max-height: 80vh;
+    z-index: 25;
+    border-top: var(--bind);
+    transform: translateY(100%);
+    transition: transform var(--dur-ui) ease;
+  }
+
+  .appshell--has-drawer .appshell__drawer {
+    transform: translateY(0);
+  }
+
+  /* Hamburger placeholder — toggles the internal mobileOpen state */
+  .appshell__hamburger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    top: var(--space-3);
+    left: var(--space-3);
+    z-index: 40;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    font-size: 20px;
+    line-height: 1;
+    color: var(--ink);
+    background: var(--paper);
+    border: var(--bind);
+    border-radius: var(--r-1);
+  }
+
+  .appshell--mobile-open .appshell__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    background: rgba(24, 23, 19, 0.4);
+  }
+}
