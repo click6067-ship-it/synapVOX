@@ -12,6 +12,7 @@
 """
 
 import hashlib
+import os
 import re
 import time
 from collections import deque
@@ -35,6 +36,10 @@ _MAX_PROJECTS = 60  # 새 그룹 무한 생성 방어(신규 프로젝트 최초
 # shipped 데모 키로 스크립트가 짧은 시간에 비싼 LLM 추출을 폭주시키는 것을 차단.
 _RATE_WINDOW_S = 3600  # 창(초)
 _RATE_MAX_WRITES = 30  # 창당 IP별 쓰기 허용 횟수(팀 데모 정상 사용에는 충분히 넉넉)
+# 신뢰 프록시 홉 수 — 실제 클라이언트 IP는 X-Forwarded-For의 '오른쪽에서 이만큼' 들어간 항목.
+# 신뢰 프록시(Render 등)가 오른쪽에 실제 IP를 덧붙이므로, 왼쪽 홉(클라이언트 위조 가능)을
+# 쓰면 rate limit이 헤더 위조로 우회된다. 기본 1 = 프록시 1대 뒤(Render).
+_XFF_TRUST_HOPS = int(os.environ.get("SVX_XFF_TRUST_HOPS", "1"))
 
 
 def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_reset=False):
@@ -78,9 +83,12 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
     _write_log: dict[str, deque] = {}
 
     def _client_ip(request: Request) -> str:
-        # Render 등 프록시 뒤 — 실제 클라이언트는 X-Forwarded-For 첫 홉.
-        fwd = request.headers.get("x-forwarded-for", "")
-        return fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
+        # 실제 클라이언트 IP = 신뢰 프록시가 오른쪽에 덧붙인 항목(왼쪽 홉은 위조 가능).
+        # X-Forwarded-For "clientspoof, ..., realclient" → 오른쪽에서 _XFF_TRUST_HOPS번째.
+        fwd = [x.strip() for x in request.headers.get("x-forwarded-for", "").split(",") if x.strip()]
+        if fwd:
+            return fwd[max(0, len(fwd) - _XFF_TRUST_HOPS)]
+        return request.client.host if request.client else "?"
 
     def _rate_limit(request: Request):
         ip = _client_ip(request)

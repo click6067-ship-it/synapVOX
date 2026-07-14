@@ -181,6 +181,18 @@ def test_write_rate_limit_per_ip():
     assert r.status_code == 429
 
 
+def test_rate_limit_not_bypassable_via_forged_xff():
+    # 왼쪽(클라이언트 위조 가능) 홉을 매 요청 바꿔도 신뢰 프록시가 붙인 오른쪽 홉이 같으면
+    # 같은 버킷 → X-Forwarded-For 위조로 rate limit을 우회할 수 없다.
+    client, engine = _client(readonly=False)
+    engine.sessions_count = 1
+    for i in range(30):
+        hdr = {**h(), "X-Forwarded-For": f"9.9.9.{i}, 203.0.113.7"}  # 왼쪽 위조·오른쪽 실제
+        assert client.post("/ingest-text", json={"text": "x"}, headers=hdr).status_code == 200, i
+    hdr = {**h(), "X-Forwarded-For": "1.1.1.1, 203.0.113.7"}
+    assert client.post("/ingest-text", json={"text": "x"}, headers=hdr).status_code == 429
+
+
 def test_rate_limit_is_app_scoped():
     # 앱마다 별도 로그 — 한 배포의 스로틀이 다른 배포로 새지 않음(테스트 격리도 보장).
     c1, e1 = _client(readonly=False); e1.sessions_count = 1
