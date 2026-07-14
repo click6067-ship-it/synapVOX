@@ -2,7 +2,7 @@
 // the user message + a pending "…" assistant placeholder, calls ask(project, q),
 // then swaps the placeholder for the answer (or a fallback on failure).
 import { useEffect, useRef, useState } from 'react'
-import { ask } from '../api/client'
+import { ApiError, ask } from '../api/client'
 
 type Props = {
   project: string
@@ -58,12 +58,14 @@ function ChatPanel({ project }: Props) {
       const { answer } = await ask(project, q)
       const text = answer?.trim() || '관련한 근거를 찾지 못했어요. 다른 방식으로 질문해 보시겠어요?'
       setMessages((m) => m.map((msg) => (msg.id === pendingId ? { ...msg, text, pending: false } : msg)))
-    } catch {
-      setMessages((m) =>
-        m.map((msg) =>
-          msg.id === pendingId ? { ...msg, text: '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.', pending: false } : msg,
-        ),
-      )
+    } catch (e) {
+      // 알려진 한도(질문이 너무 김 413 / 요청이 너무 잦음 429)는 백엔드 메시지를 그대로,
+      // 그 외는 일반 재시도 안내. (Home·Workspace의 에러 전파와 동일한 규약)
+      const text =
+        e instanceof ApiError && (e.status === 413 || e.status === 429)
+          ? e.message
+          : '답변을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      setMessages((m) => m.map((msg) => (msg.id === pendingId ? { ...msg, text, pending: false } : msg)))
     } finally {
       setBusy(false)
     }

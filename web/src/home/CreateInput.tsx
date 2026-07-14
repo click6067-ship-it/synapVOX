@@ -42,7 +42,7 @@ function CreateInput({ title, text, onTitleChange, onTextChange, onSubmit, submi
       <textarea
         ref={textareaRef}
         className="create-input-text"
-        placeholder="강의·노트를 붙여넣어 지식 그래프를 만드세요. 빈 줄로 섹션(세션)을 나눌 수 있어요."
+        placeholder="강의·노트를 붙여넣으면 개념을 뽑아 지식 그래프로 이어 드려요. 여러 강의는 워크스페이스에서 계속 추가할 수 있어요."
         value={text}
         onChange={(e) => onTextChange(e.target.value)}
         onKeyDown={handleKeyDown}
