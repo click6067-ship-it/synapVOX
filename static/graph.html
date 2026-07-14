@@ -743,7 +743,12 @@ const sampleIdx = { bio: 0, dl: 0 };
 const sampleLabel = { bio: "생명", dl: "딥러닝" };
 function fillSample(kind) {
   const arr = SAMPLES[kind] || [];
-  if (!arr.length) return;
+  const msg = $("#tiMsg");
+  if (!arr.length) {   // sampleData 부재/파싱 실패 — 무피드백 방지
+    msg.className = "err";
+    msg.textContent = "샘플 데이터를 불러올 수 없습니다. 페이지를 새로고침해 주세요.";
+    return;
+  }
   const pos = sampleIdx[kind] % arr.length;
   const s = arr[pos];
   sampleIdx[kind]++;
@@ -752,9 +757,12 @@ function fillSample(kind) {
   $("#tiKeywords").value = "";
   $("#tiText").value = s.text || "";
   updateTiSubmit();
-  const msg = $("#tiMsg");
   msg.className = "";
-  msg.textContent = `${sampleLabel[kind]} 샘플 채움 (${pos + 1}/${arr.length}): ${s.title} — '그래프에 추가'를 누르세요.`;
+  // readonly 배포에서는 제출이 403이므로 CTA를 정직하게 안내
+  const cta = deployReadonly
+    ? "이 배포는 읽기 전용이라 추가는 동작하지 않습니다 (미리보기)."
+    : "‘그래프에 추가’를 누르세요.";
+  msg.textContent = `${sampleLabel[kind]} 샘플 채움 (${pos + 1}/${arr.length}): ${s.title} — ${cta}`;
   $("#tiText").focus();
   $("#tiText").scrollTop = 0;
 }
@@ -1307,6 +1315,7 @@ $("#q").addEventListener("keydown", e => {
 
 /* ---- RAG Q&A (/ask, /config) --------------------------------------- */
 let ragConfig = { rag_enabled: false, chat_model: null, embed_model: null };
+let deployReadonly = false;   // /config.readonly — 읽기 전용 공개 배포면 추가(ingest)가 403
 
 async function loadConfig() {
   try {
@@ -1316,10 +1325,16 @@ async function loadConfig() {
       chat_model: c.chat_model || null,
       embed_model: c.embed_model || null,
     };
+    deployReadonly = !!c.readonly;
   } catch (e) {
     ragConfig = { rag_enabled: false, chat_model: null, embed_model: null };
   }
   applyRagConfig();
+  if (deployReadonly) {   // CTA가 될 것처럼 유도하지 않도록 미리 알림
+    const msg = $("#tiMsg");
+    msg.className = "";
+    msg.textContent = "읽기 전용 배포입니다 — 샘플 채우기는 미리보기용이며 ‘그래프에 추가’는 동작하지 않습니다.";
+  }
 }
 
 function applyRagConfig() {
