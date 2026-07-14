@@ -1,8 +1,8 @@
 """GraphitiEngine — SynapVox 백엔드를 Graphiti(시계열 지식 그래프) 위에 재구현.
 
-- 세션(강의)을 Graphiti의 episode로 넣으면 엔티티·관계를 LLM이 자동 추출(gpt-5.4).
+- 세션(강의)을 Graphiti의 episode로 넣으면 엔티티·관계를 LLM이 자동 추출(gpt-5.6).
 - 세션 간 연결 = 여러 episode가 공유하는 엔티티 + Graphiti가 학습한 엔티티-엔티티 관계(fact).
-- 질의(RAG) = graphiti.search(하이브리드) → fact 근거 → gpt-5.6-sol 답변.
+- 질의(RAG) = graphiti.search(하이브리드) → fact 근거 → gpt-5.6 답변.
 - group_id = project_id (그래프 격리).
 
 Neo4j 읽기(그래프 시각화·상세)는 별도 neo4j async driver로, 쓰기·검색은 Graphiti로.
@@ -36,8 +36,11 @@ class Concept(BaseModel):
 # 기본 Entity(named 편향, "애매하면 추출 안 함")에 더해 개념형을 추가 → 추상 개념도 추출.
 CONCEPT_ENTITY_TYPES = {"Concept": Concept}
 
-EXTRACT_MODEL = os.environ.get("GRAPHITI_MODEL", "gpt-5.5")        # Graphiti 기본·최상위(엔티티/관계 추출)
-ANSWER_MODEL = os.environ.get("ANSWER_MODEL", "gpt-5.6-sol")       # 최상위(RAG 답변, temperature 미전송)
+EXTRACT_MODEL = os.environ.get("GRAPHITI_MODEL", "gpt-5.6")        # Graphiti 엔티티/관계 추출(계정 접근 가능 모델)
+ANSWER_MODEL = os.environ.get("ANSWER_MODEL", "gpt-5.6")           # RAG 답변(temperature 미전송)
+# Graphiti는 reasoning 모델에 reasoning.effort를 보낸다. 기본값 'minimal'은 gpt-5.6이
+# 거부하므로(지원값: none/low/medium/high/xhigh) 추출용으로 'low'를 명시한다.
+EXTRACT_REASONING = os.environ.get("GRAPHITI_REASONING", "low")
 EMBED_MODEL = os.environ.get("EMBED_MODEL", "text-embedding-3-large")
 BASE_DATE = datetime(2026, 3, 1, tzinfo=timezone.utc)
 
@@ -48,7 +51,7 @@ class GraphitiEngine:
         uri = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
         user = os.environ.get("NEO4J_USER", "neo4j")
         pw = os.environ.get("NEO4J_PASSWORD", "synapvox123")
-        llm = OpenAIClient(config=LLMConfig(api_key=key, model=EXTRACT_MODEL))
+        llm = OpenAIClient(config=LLMConfig(api_key=key, model=EXTRACT_MODEL), reasoning=EXTRACT_REASONING)
         embedder = OpenAIEmbedder(config=OpenAIEmbedderConfig(api_key=key, embedding_model=EMBED_MODEL, embedding_dim=3072))
         self.g = Graphiti(uri, user, pw, llm_client=llm, embedder=embedder)
         self.driver = AsyncGraphDatabase.driver(uri, auth=(user, pw))
