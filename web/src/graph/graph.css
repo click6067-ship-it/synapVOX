@@ -1,0 +1,95 @@
+/* Dark force-graph styling. Colors pull from tokens.css. */
+
+.graph-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  touch-action: none; /* pointer-driven pan/zoom, no browser gestures */
+  cursor: grab;
+  user-select: none;
+}
+.graph-canvas:active {
+  cursor: grabbing;
+}
+
+/* ---- edges ---- */
+.edge {
+  fill: none;
+  stroke: var(--edge);
+  stroke-width: 1;
+  opacity: 0.5;
+}
+.edge-mentions {
+  stroke: var(--edge);
+  stroke-dasharray: 2 3;
+  opacity: 0.32;
+}
+.edge-cooccur {
+  stroke: var(--accent-conc);
+  opacity: 0.28;
+}
+.edge-next {
+  stroke: var(--accent-sess);
+  stroke-width: 1.6;
+  opacity: 0.72;
+}
+.edge-continues {
+  stroke: #b98cf0;
+  opacity: 0.55;
+}
+.edge-expands {
+  stroke: #c9a24a;
+  opacity: 0.52;
+}
+
+.marker-next {
+  fill: var(--accent-sess);
+}
+.marker-continues {
+  fill: #b98cf0;
+}
+.marker-expands {
+  fill: #c9a24a;
+}
+
+/* ---- nodes ---- */
+.node {
+  cursor: pointer;
+}
+.node-concept-dot {
+  fill: var(--surface-2);
+  stroke: var(--accent-conc);
+  stroke-width: 1.5;
+}
+.node-session-box {
+  fill: var(--surface);
+  stroke: var(--accent-sess);
+  stroke-width: 1.5;
+}
+
+/* selection glow via stroke (+ subtle drop-shadow) */
+.node.selected .node-concept-dot {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px var(--accent-conc));
+}
+.node.selected .node-session-box {
+  stroke-width: 3;
+  filter: drop-shadow(0 0 6px var(--accent-sess));
+}
+
+.node-seq {
+  fill: var(--ink);
+  font-family: var(--mono);
+  font-size: 9px;
+  pointer-events: none;
+}
+.node-label {
+  fill: var(--sub);
+  font-family: var(--sans);
+  font-size: 10px;
+  pointer-events: none;
+}
+.node.selected .node-label {
+  fill: var(--ink);
+}
