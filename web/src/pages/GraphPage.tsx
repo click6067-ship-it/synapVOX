@@ -73,8 +73,11 @@ export default function GraphPage() {
   //     GraphView mounts and fetches the freshly-seeded graph.
   const handleIngested = useCallback(
     async (target: string) => {
+      // Refresh the project list so switcher entries + counts reflect the new
+      // session / new project (was stale until reload).
+      listProjects().then(setProjects).catch(() => {})
       if (target !== project) {
-        navigate(`/p/${target}`)
+        navigate(`/p/${target}`) // new project → its GraphView mounts + fetches
         return
       }
       try {

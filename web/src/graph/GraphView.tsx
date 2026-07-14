@@ -104,6 +104,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const [hover, setHover] = useState<FNode | null>(null) // hovered node → tooltip + tick
   const [, setAskTick] = useState(0) // re-render tick when RAG expansion changes
   const [pulse, setPulse] = useState<GrowthPulse | null>(null) // Growth Ring fire signal
+  const [retryTick, setRetryTick] = useState(0) // error-overlay retry → re-fetch
 
   // Sync the RAG expansion set into a ref (canvas accessors read live) + one
   // re-render so drawNode/linkColor re-run. Highlights the answer's evidence
@@ -133,8 +134,10 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
     // node OBJECTS are reused, d3 preserves their positions/velocities (no jump).
     setData(nextData)
     // The reheat below re-settles the newcomer → HUD reads "settling…" until
-    // handleEngineStop flips it back to settled.
+    // handleEngineStop flips it back to settled. Re-emit sessions so the sidebar
+    // list + session count pick up the newly-added lecture (was stale).
     onGraphMeta?.({ nodes: nextData.nodes.length, edges: nextData.links.length, settled: false })
+    onSessions?.(nextData.nodes.filter((n) => n.type === 'session'))
 
     // Revive + calm reheat AFTER ForceGraph re-binds the new data (next frame).
     // cooldownTicks stays 200 → the graph re-CALMS, it does not re-freeze dead.
@@ -153,7 +156,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       .find((n) => n?.type === 'session')
     const ringNodeId = sessionNew?.id ?? merged.anchorId ?? merged.addedNodeIds[0] ?? null
     if (ringNodeId) setPulse({ id: ++pulseCounterRef.current, nodeId: ringNodeId })
-  }, [onGraphMeta])
+  }, [onGraphMeta, onSessions])
 
   useImperativeHandle(ref, () => ({ growWith }), [growWith])
 
@@ -225,7 +228,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       cancelled = true
       clearTimeout(coldTimer)
     }
-  }, [project, reloadKey, onGraphMeta])
+  }, [project, reloadKey, retryTick, onGraphMeta])
 
   // ── Tune d3-force like Obsidian, once per data load ───────────────────────
   // Runs after the graph mounts. Because ForceGraph2D only mounts once dims are
@@ -530,6 +533,9 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
             <>
               <div style={overlayTitle}>그래프를 불러오지 못했어요</div>
               <div style={overlaySub}>{errMsg}</div>
+              <button type="button" style={overlayRetry} onClick={() => setRetryTick((t) => t + 1)}>
+                다시 시도
+              </button>
             </>
           )}
           {isEmpty && (
@@ -576,6 +582,19 @@ const overlaySub: React.CSSProperties = {
   fontSize: 14,
   color: '#9aa39c',
   maxWidth: 360,
+}
+
+const overlayRetry: React.CSSProperties = {
+  marginTop: 12,
+  padding: '8px 18px',
+  fontFamily: 'var(--font-ui)',
+  fontSize: 13,
+  color: '#D8FF6A',
+  background: 'transparent',
+  border: '1px solid #D8FF6A',
+  borderRadius: 4,
+  cursor: 'pointer',
+  pointerEvents: 'auto', // the overlay wrapper is click-through; the button opts back in
 }
 
 const tooltipLabel: React.CSSProperties = {
