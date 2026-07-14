@@ -1,7 +1,7 @@
 // Home = the main page (Daglo-style: no separate hero — the input+tiles+recent IS the page).
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ingestText, listProjects } from '../api/client'
+import { ApiError, ingestText, listProjects } from '../api/client'
 import CreateInput from './CreateInput'
 import ActionTiles from './ActionTiles'
 import ProjectGrid from './ProjectGrid'
@@ -68,8 +68,15 @@ function Home() {
     try {
       await ingestText(slug, derivedTitle, text)
       navigate(`/p/${slug}`)
-    } catch {
-      setSubmitError('그래프를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    } catch (e) {
+      // Surface a known limit (text too long / project cap) verbatim; otherwise
+      // a generic retry message. On failure we never navigate — the workspace
+      // would be empty/broken — the input keeps its text so the user can retry.
+      const msg =
+        e instanceof ApiError && (e.status === 413 || e.status === 429)
+          ? e.message
+          : '그래프를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.'
+      setSubmitError(msg)
       setSubmitting(false)
     }
   }

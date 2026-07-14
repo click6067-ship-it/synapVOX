@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import GraphCanvas, { type FilterState } from '../graph/GraphCanvas'
 import type { GraphNode } from '../graph/mapGraph'
-import { ingestText } from '../api/client'
+import { ApiError, ingestText } from '../api/client'
 import SourcesPanel from './SourcesPanel'
 import ChatPanel from './ChatPanel'
 import './workspace.css'
@@ -74,8 +74,14 @@ function Workspace() {
       setAddText('')
       setAddOpen(false)
       setReloadKey((k) => k + 1) // re-fetch the graph so the new session appears
-    } catch {
-      setAddError('추가하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    } catch (e) {
+      // Known limit (text too long / session cap) → show the backend message;
+      // otherwise a generic retry. Text is kept so the user can retry/trim.
+      setAddError(
+        e instanceof ApiError && (e.status === 413 || e.status === 429)
+          ? e.message
+          : '추가하지 못했습니다. 잠시 후 다시 시도해 주세요.',
+      )
     } finally {
       setAdding(false)
     }

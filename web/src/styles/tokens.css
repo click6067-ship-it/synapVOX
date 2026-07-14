@@ -6,6 +6,8 @@
   --edge:#3a4050; --danger:#e0674a;
   --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
   --sans:'Pretendard',system-ui,'Apple SD Gothic Neo',sans-serif;
-  --radius:14px; --shadow:0 8px 30px rgba(0,0,0,.4);
+  /* Radii vary by element role (not one blanket value): dense cards read
+     tighter, tactile tiles rounder, the hero input in between. */
+  --radius:14px; --radius-lg:18px; --radius-sm:11px; --shadow:0 8px 30px rgba(0,0,0,.4);
 }
 *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}

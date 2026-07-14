@@ -23,6 +23,10 @@ class StubEngine:
     def __init__(self):
         self.ingested, self.reset_called = [], False
         self.last_ingest_project = self.last_reset_project = None
+        self.last_project = None
+        # Configurable so cap tests can simulate a full project / many projects.
+        self.sessions_count = 0
+        self._projects = [{"project": "P-BIO", "sessions": 2, "concepts": 5}]
 
     async def init(self):
         pass
@@ -31,7 +35,7 @@ class StubEngine:
         pass
 
     async def sessions_in(self, pid):
-        return []
+        return [{"name": f"s{i}"} for i in range(self.sessions_count)]
 
     async def ingest(self, pid, title, text, seq=None):
         self.last_ingest_project = pid
@@ -43,7 +47,7 @@ class StubEngine:
         self.reset_called = True
 
     async def list_projects(self):
-        return [{"project": "P-BIO", "sessions": 2, "concepts": 5}]
+        return self._projects
 
     async def graph(self, pid):
         self.last_project = pid
@@ -123,6 +127,47 @@ def test_invalid_project_id_returns_400():
     r = client.get("/graph?project=bad!id", headers=h())
     assert r.status_code == 400
     assert r.json()["detail"] == "invalid project id"
+
+
+def test_default_project_from_key_map():
+    # project 미지정이면 key_map 값(이 키의 기본 프로젝트)이 쓰인다 — 하드코딩 아님.
+    eng = StubEngine()
+    app = create_app(eng, CORPUS, {hashlib.sha256(b"demo-bio").hexdigest(): "P-DEFAULT"}, ["*"], readonly=False)
+    with TestClient(app) as c:
+        c.get("/graph", headers=h())
+    assert eng.last_project == "P-DEFAULT"
+
+
+def test_ingest_text_rejects_too_long():
+    client, engine = _client(readonly=False)
+    r = client.post("/ingest-text", json={"text": "가" * 50_001}, headers=h())
+    assert r.status_code == 413
+    assert engine.ingested == []  # 상한 초과는 엔진(비싼 LLM 추출) 호출 전에 차단
+
+
+def test_ingest_text_session_cap():
+    client, engine = _client(readonly=False)
+    engine.sessions_count = 40  # 프로젝트가 세션 한도에 도달
+    r = client.post("/ingest-text", json={"text": "본문"}, headers=h())
+    assert r.status_code == 429
+    assert engine.ingested == []
+
+
+def test_ingest_text_project_cap_on_new_project():
+    client, engine = _client(readonly=False)
+    engine.sessions_count = 0  # 신규 프로젝트(그룹 생성 시점)
+    engine._projects = [{"project": f"P-{i}", "sessions": 1, "concepts": 1} for i in range(60)]
+    r = client.post("/ingest-text", json={"project": "P-NEW", "text": "본문"}, headers=h())
+    assert r.status_code == 429
+    assert engine.ingested == []
+
+
+def test_ingest_text_within_caps_succeeds():
+    client, engine = _client(readonly=False)
+    engine.sessions_count = 3  # 기존 프로젝트에 추가(신규 아님 → 프로젝트 캡 검사 스킵)
+    r = client.post("/ingest-text", json={"text": "짧은 본문"}, headers=h())
+    assert r.status_code == 200
+    assert engine.ingested == [("붙여넣은 강의", 4)]  # seq = n+1
 
 
 def test_reset_blocked_by_default_even_when_writable():

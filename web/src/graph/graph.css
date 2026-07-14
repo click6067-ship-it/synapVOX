@@ -193,6 +193,74 @@
   color: var(--faint);
 }
 
+/* ---- loading / cold-start / error / empty overlay ---- */
+.graph-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  background: radial-gradient(ellipse at center, rgba(14, 15, 19, 0.55), rgba(14, 15, 19, 0.82));
+  backdrop-filter: blur(1.5px);
+  animation: graph-overlay-in 0.24s ease both;
+}
+@keyframes graph-overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.graph-overlay-title {
+  margin: 0;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 14px;
+}
+.graph-overlay-sub {
+  margin: 0;
+  max-width: 320px;
+  color: var(--sub);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.graph-spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(63, 185, 160, 0.22);
+  border-top-color: var(--accent-conc);
+  animation: graph-spin 0.8s linear infinite;
+}
+@keyframes graph-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.graph-overlay-retry {
+  margin-top: 4px;
+  padding: 8px 16px;
+  border: 1px solid var(--accent-conc);
+  border-radius: var(--radius-sm);
+  background: rgba(63, 185, 160, 0.1);
+  color: var(--accent-conc);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.graph-overlay-retry:hover {
+  background: rgba(63, 185, 160, 0.2);
+  transform: translateY(-1px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .edge,
   .node,
@@ -200,5 +268,11 @@
   .node-session-box,
   .graph-tooltip {
     transition: none;
+  }
+  .graph-spinner {
+    animation-duration: 1.6s;
+  }
+  .graph-overlay {
+    animation: none;
   }
 }

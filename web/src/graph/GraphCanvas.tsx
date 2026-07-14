@@ -81,6 +81,12 @@ function markerFor(rc: RelClass): string | undefined {
 export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad, reloadKey, highlightId }: Props) {
   const [graph, setGraph] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Graph-area status so the canvas shows a distinct loading / cold-start /
+  // error / empty state instead of a blank SVG. `coldStart` flips on after a
+  // few seconds still loading (Render free-tier wakes in ~50s).
+  const [status, setStatus] = useState<'loading' | 'error' | 'ready'>('loading')
+  const [coldStart, setColdStart] = useState(false)
+  const [retryTick, setRetryTick] = useState(0)
 
   // Latest onGraphLoad without it being a load-effect dependency (a new callback
   // identity from a parent re-render must not re-fetch the graph).
@@ -271,6 +277,12 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
     selectedIdRef.current = null
     setGraph(null)
     setSelectedId(null)
+    setStatus('loading')
+    setColdStart(false)
+    // Render free-tier can take ~50s to wake; after 6s still loading, reassure.
+    const coldTimer = setTimeout(() => {
+      if (!cancelled) setColdStart(true)
+    }, 6000)
 
     getGraph(project)
       .then((raw) => {
@@ -297,24 +309,31 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
         // → 로드 시 오래 출렁이지 않고 짧은 마무리 정착만 보인 뒤 멈춘다.
         const warm = simRef.current.sim
         for (let i = 0; i < 220; i++) stepSim(warm, W, H)
+        clearTimeout(coldTimer)
         setGraph(g)
+        setStatus('ready')
         ensureLoop()
         onGraphLoadRef.current?.(g.nodes)
       })
       .catch(() => {
         if (!cancelled) {
-          setGraph({ nodes: [], links: [] })
+          // Error is NOT an empty graph — keep them distinct so a cold/broken
+          // backend shows a retry, not a misleading "no concepts yet".
+          clearTimeout(coldTimer)
+          setGraph(null)
+          setStatus('error')
           onGraphLoadRef.current?.([])
         }
       })
 
     return () => {
       cancelled = true
+      clearTimeout(coldTimer)
       const s = simRef.current
       if (s && s.raf != null) cancelAnimationFrame(s.raf)
       simRef.current = null
     }
-  }, [project, reloadKey, ensureLoop])
+  }, [project, reloadKey, retryTick, ensureLoop])
 
   // Place elements after any structural render (graph load, filter toggle).
   // Also re-apply the stage transform here — a structural React re-render
@@ -615,6 +634,29 @@ export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad
         <span className="graph-tooltip-label" ref={tipLabelRef} />
         <span className="graph-tooltip-meta" ref={tipMetaRef} />
       </div>
+
+      {status === 'loading' && (
+        <div className="graph-overlay" role="status" aria-live="polite">
+          <span className="graph-spinner" aria-hidden="true" />
+          <p className="graph-overlay-title">지식 그래프를 불러오는 중…</p>
+          {coldStart && <p className="graph-overlay-sub">서버를 깨우고 있어요. 처음이면 최대 50초 걸릴 수 있어요.</p>}
+        </div>
+      )}
+      {status === 'error' && (
+        <div className="graph-overlay" role="alert">
+          <p className="graph-overlay-title">그래프를 불러오지 못했습니다.</p>
+          <p className="graph-overlay-sub">서버가 잠들어 있거나 일시적인 문제일 수 있어요.</p>
+          <button type="button" className="graph-overlay-retry" onClick={() => setRetryTick((t) => t + 1)}>
+            다시 시도
+          </button>
+        </div>
+      )}
+      {status === 'ready' && graph?.nodes.length === 0 && (
+        <div className="graph-overlay" role="status">
+          <p className="graph-overlay-title">아직 개념이 없어요.</p>
+          <p className="graph-overlay-sub">‘＋ 텍스트로 추가’로 강의·노트를 넣으면 개념 그래프가 그려져요.</p>
+        </div>
+      )}
     </div>
   )
 }

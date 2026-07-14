@@ -33,19 +33,11 @@ function IconProjects() {
     </svg>
   )
 }
-function IconAsk() {
+function IconSearch() {
   return (
     <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-      <path
-        d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7A2.5 2.5 0 0 1 17.5 16H10l-4.5 4v-4H6.5A2.5 2.5 0 0 1 4 13.5z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <text x="12" y="12.5" textAnchor="middle" fontSize="8" fill="currentColor">
-        ?
-      </text>
+      <circle cx="11" cy="11" r="6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M15.5 15.5 L20 20" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   )
 }
@@ -130,16 +122,23 @@ function Drawer() {
             </span>
             {!collapsed && <span className="drawer-item-label">내 프로젝트</span>}
           </NavLink>
+          {/* Coming-soon: cross-project search. Deliberately NOT "AI 질문" — that
+              (per-project chat) already works inside the workspace, so a disabled
+              copy of it here would read as "chat unavailable". */}
           <button
             type="button"
             className="drawer-item drawer-item--placeholder"
-            aria-disabled="true"
-            title={collapsed ? 'AI 질문 (준비 중)' : '준비 중'}
+            disabled
+            title={collapsed ? '전역 검색 (곧 제공)' : '곧 제공'}
           >
             <span className="drawer-item-icon">
-              <IconAsk />
+              <IconSearch />
             </span>
-            {!collapsed && <span className="drawer-item-label">AI 질문</span>}
+            {!collapsed && (
+              <span className="drawer-item-label">
+                전역 검색 <span className="soon-badge">곧</span>
+              </span>
+            )}
           </button>
         </nav>
 
@@ -154,11 +153,15 @@ function Drawer() {
             <IconChevron pointingRight={collapsed} />
             {!collapsed && <span className="drawer-item-label">접기</span>}
           </button>
-          <button type="button" className="drawer-item drawer-item--placeholder" title={collapsed ? '프로필 (준비 중)' : '준비 중'}>
+          <button type="button" className="drawer-item drawer-item--placeholder" disabled title={collapsed ? '프로필 (곧 제공)' : '곧 제공'}>
             <span className="drawer-item-icon">
               <IconUser />
             </span>
-            {!collapsed && <span className="drawer-item-label">프로필</span>}
+            {!collapsed && (
+              <span className="drawer-item-label">
+                프로필 <span className="soon-badge">곧</span>
+              </span>
+            )}
           </button>
         </div>
       </aside>
