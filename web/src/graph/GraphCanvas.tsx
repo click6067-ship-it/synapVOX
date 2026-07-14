@@ -72,18 +72,33 @@ function markerFor(rc: RelClass): string | undefined {
 export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
   const [graph, setGraph] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [viewport, setViewport] = useState<Viewport>({ x: 0, y: 0, scale: 1 })
 
   const svgRef = useRef<SVGSVGElement | null>(null)
+  // Outer stage <g> that carries the pan/zoom transform. Mutated imperatively
+  // (setAttribute) from viewportRef — never via React state — so pan/wheel
+  // ticks don't trigger a component re-render.
+  const stageRef = useRef<SVGGElement | null>(null)
   const nodeElRef = useRef<Map<string, SVGGElement>>(new Map())
   const edgeElRef = useRef<Map<string, { el: SVGLineElement; from: string; to: string }>>(new Map())
+  // Memoized per-id ref-callback caches so occasional structural re-renders
+  // (select/filter) don't detach/reattach every node/edge DOM ref — the ref
+  // callback identity for a given id/key stays stable across renders.
+  const nodeRefCacheRef = useRef<Map<string, (el: SVGGElement | null) => void>>(new Map())
+  const edgeRefCacheRef = useRef<Map<string, (el: SVGLineElement | null) => void>>(new Map())
   const simRef = useRef<SimState | null>(null)
-  // Latest viewport for imperative pointer math (avoids stale closures in the
-  // native wheel listener); React state stays the source of truth for render.
-  const viewportRef = useRef(viewport)
-  viewportRef.current = viewport
+  // Source of truth for pan/zoom — a ref, not React state, so updating it
+  // never triggers a re-render (and thus never re-attaches node/edge refs).
+  const viewportRef = useRef<Viewport>({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef<{ id: string; moved: boolean; sx: number; sy: number } | null>(null)
   const panRef = useRef<{ vbX: number; vbY: number; vx: number; vy: number; moved: boolean } | null>(null)
+
+  // Imperatively push viewportRef.current onto the stage <g>'s transform.
+  const applyViewport = useCallback(() => {
+    const stage = stageRef.current
+    if (!stage) return
+    const v = viewportRef.current
+    stage.setAttribute('transform', `translate(${v.x} ${v.y}) scale(${v.scale})`)
+  }, [])
 
   // --- physics loop (imperative; no setState per frame) ---
   const runStep = useCallback(() => {
@@ -142,6 +157,8 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
     let cancelled = false
     nodeElRef.current.clear()
     edgeElRef.current.clear()
+    nodeRefCacheRef.current.clear()
+    edgeRefCacheRef.current.clear()
     setGraph(null)
     setSelectedId(null)
 
@@ -172,9 +189,13 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
   }, [project, ensureLoop])
 
   // Place elements after any structural render (graph load, filter toggle).
+  // Also re-apply the stage transform here — a structural React re-render
+  // doesn't touch the stage <g> itself, but this keeps pan/zoom correct even
+  // if that ever changes (e.g. a future key change remounts the stage).
   useLayoutEffect(() => {
     syncPositions()
-  }, [graph, filter, syncPositions])
+    applyViewport()
+  }, [graph, filter, syncPositions, applyViewport])
 
   // Native, non-passive wheel listener so preventDefault works (zoom to cursor).
   useEffect(() => {
@@ -185,17 +206,17 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
       const ctm = svg.getScreenCTM()
       if (!ctm) return
       const p = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse())
-      setViewport((v) => {
-        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
-        const scale = Math.min(2.2, Math.max(0.4, v.scale * factor))
-        const gx = (p.x - v.x) / v.scale
-        const gy = (p.y - v.y) / v.scale
-        return { x: p.x - gx * scale, y: p.y - gy * scale, scale }
-      })
+      const v = viewportRef.current
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1
+      const scale = Math.min(2.2, Math.max(0.4, v.scale * factor))
+      const gx = (p.x - v.x) / v.scale
+      const gy = (p.y - v.y) / v.scale
+      viewportRef.current = { x: p.x - gx * scale, y: p.y - gy * scale, scale }
+      applyViewport()
     }
     svg.addEventListener('wheel', onWheel, { passive: false })
     return () => svg.removeEventListener('wheel', onWheel)
-  }, [])
+  }, [applyViewport])
 
   // --- coordinate helpers ---
   const screenToViewBox = useCallback((clientX: number, clientY: number) => {
@@ -276,7 +297,8 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
   // --- background pan / deselect ---
   const onBgDown = (e: RPointerEvent<SVGSVGElement>) => {
     const vb = screenToViewBox(e.clientX, e.clientY)
-    panRef.current = { vbX: vb.x, vbY: vb.y, vx: viewport.x, vy: viewport.y, moved: false }
+    const v = viewportRef.current
+    panRef.current = { vbX: vb.x, vbY: vb.y, vx: v.x, vy: v.y, moved: false }
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
 
@@ -285,7 +307,9 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
     if (!p) return
     const vb = screenToViewBox(e.clientX, e.clientY)
     if (Math.hypot(vb.x - p.vbX, vb.y - p.vbY) > 2) p.moved = true
-    setViewport((v) => ({ ...v, x: p.vx + (vb.x - p.vbX), y: p.vy + (vb.y - p.vbY) }))
+    const v = viewportRef.current
+    viewportRef.current = { ...v, x: p.vx + (vb.x - p.vbX), y: p.vy + (vb.y - p.vbY) }
+    applyViewport()
   }
 
   const onBgUp = (e: RPointerEvent<SVGSVGElement>) => {
@@ -315,13 +339,30 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
     return set
   }, [filter.coreOnly, graph])
 
-  const setNodeRef = (id: string) => (el: SVGGElement | null) => {
-    if (el) nodeElRef.current.set(id, el)
-    else nodeElRef.current.delete(id)
+  // Memoized: returns the SAME callback instance for a given id/key across
+  // renders, so React doesn't see a "new ref" and detach/reattach the DOM
+  // node on every re-render triggered by selection/filter changes.
+  const getNodeRef = (id: string) => {
+    let fn = nodeRefCacheRef.current.get(id)
+    if (!fn) {
+      fn = (el: SVGGElement | null) => {
+        if (el) nodeElRef.current.set(id, el)
+        else nodeElRef.current.delete(id)
+      }
+      nodeRefCacheRef.current.set(id, fn)
+    }
+    return fn
   }
-  const setEdgeRef = (key: string, from: string, to: string) => (el: SVGLineElement | null) => {
-    if (el) edgeElRef.current.set(key, { el, from, to })
-    else edgeElRef.current.delete(key)
+  const getEdgeRef = (key: string, from: string, to: string) => {
+    let fn = edgeRefCacheRef.current.get(key)
+    if (!fn) {
+      fn = (el: SVGLineElement | null) => {
+        if (el) edgeElRef.current.set(key, { el, from, to })
+        else edgeElRef.current.delete(key)
+      }
+      edgeRefCacheRef.current.set(key, fn)
+    }
+    return fn
   }
 
   return (
@@ -354,7 +395,7 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
         ))}
       </defs>
 
-      <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.scale})`}>
+      <g ref={stageRef}>
         <g className="edge-layer">
           {graph?.links.map((link) => {
             if (!relVisible(link.relClass)) return null
@@ -363,7 +404,7 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
             return (
               <line
                 key={key}
-                ref={setEdgeRef(key, link.from, link.to)}
+                ref={getEdgeRef(key, link.from, link.to)}
                 className={`edge edge-${link.relClass}`}
                 markerEnd={markerFor(link.relClass)}
               />
@@ -379,7 +420,7 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
             return (
               <g
                 key={node.id}
-                ref={setNodeRef(node.id)}
+                ref={getNodeRef(node.id)}
                 className={`node node-${node.type}${selected ? ' selected' : ''}`}
                 onPointerDown={(e) => onNodeDown(e, node)}
                 onPointerMove={(e) => onNodeMove(e, node)}

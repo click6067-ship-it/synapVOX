@@ -38,16 +38,34 @@ export function mapGraph(raw: GraphData): { nodes: GraphNode[]; links: GraphLink
     typeOf[n.id] = n.type === 'session' ? 'session' : 'concept'
   }
 
+  // Build the render-ready `links` FIRST, dropping edges with an unknown
+  // rel_type. Degree/bridge must be derived from this filtered list —
+  // otherwise a dropped edge would still inflate the degree (and therefore
+  // the radius `r`) of a concept that never actually gets rendered.
+  const links: GraphLink[] = []
+  for (const e of raw.edges) {
+    const relClass = REL_CLASS[e.rel_type]
+    if (!relClass) continue // drop unknown relation types
+    links.push({ from: e.src, to: e.dst, rel: e.rel_type, relClass })
+  }
+
   const degree: Record<string, number> = {}
   const mentioners: Record<string, Set<string>> = {} // concept id -> distinct session ids
 
-  for (const e of raw.edges) {
-    degree[e.src] = (degree[e.src] ?? 0) + 1
-    degree[e.dst] = (degree[e.dst] ?? 0) + 1
-    if (e.rel_type === 'SESSION_MENTIONS_CONCEPT') {
-      const sessionEnd = typeOf[e.src] === 'session' ? e.src : e.dst
-      const conceptEnd = sessionEnd === e.src ? e.dst : e.src
-      ;(mentioners[conceptEnd] ??= new Set()).add(sessionEnd)
+  for (const l of links) {
+    degree[l.from] = (degree[l.from] ?? 0) + 1
+    degree[l.to] = (degree[l.to] ?? 0) + 1
+    if (l.rel === 'SESSION_MENTIONS_CONCEPT') {
+      const srcIsSession = typeOf[l.from] === 'session'
+      const dstIsSession = typeOf[l.to] === 'session'
+      // Only attribute a mention when exactly one endpoint is a session —
+      // a malformed edge where neither (or both) endpoint is a session
+      // must not be misattributed to either side.
+      if (srcIsSession !== dstIsSession) {
+        const sessionEnd = srcIsSession ? l.from : l.to
+        const conceptEnd = srcIsSession ? l.to : l.from
+        ;(mentioners[conceptEnd] ??= new Set()).add(sessionEnd)
+      }
     }
   }
 
@@ -61,13 +79,6 @@ export function mapGraph(raw: GraphData): { nodes: GraphNode[]; links: GraphLink
     const seq = typeof seqRaw === 'number' ? seqRaw : undefined
     return { id: n.id, type, label: n.label ?? n.id, r, seq, bridge }
   })
-
-  const links: GraphLink[] = []
-  for (const e of raw.edges) {
-    const relClass = REL_CLASS[e.rel_type]
-    if (!relClass) continue // drop unknown relation types
-    links.push({ from: e.src, to: e.dst, rel: e.rel_type, relClass })
-  }
 
   return { nodes, links }
 }
