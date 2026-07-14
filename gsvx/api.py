@@ -28,13 +28,15 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
     app.add_middleware(CORSMiddleware, allow_origins=cors_origins,
                        allow_methods=["GET", "POST"], allow_headers=["X-API-Key"])
 
+    def _valid_key(x_api_key: str | None) -> bool:
+        return bool(x_api_key) and hashlib.sha256(x_api_key.encode()).hexdigest() in key_map
+
     def project_id(x_api_key: str | None = Header(None, alias="X-API-Key")) -> str:
         if not x_api_key:
             raise HTTPException(401, "API key required")
-        pid = key_map.get(hashlib.sha256(x_api_key.encode()).hexdigest())
-        if pid is None:
+        if not _valid_key(x_api_key):
             raise HTTPException(401, "invalid API key")
-        return pid
+        return key_map[hashlib.sha256(x_api_key.encode()).hexdigest()]
 
     def _guard_write():
         if readonly:
@@ -52,7 +54,7 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
 
     @app.get("/projects")
     async def projects(x_api_key: str | None = Header(None, alias="X-API-Key")):
-        if not x_api_key or hashlib.sha256(x_api_key.encode()).hexdigest() not in key_map:
+        if not _valid_key(x_api_key):
             raise HTTPException(401, "invalid API key")
         return {"projects": await engine.list_projects()}
 

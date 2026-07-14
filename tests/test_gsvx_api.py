@@ -83,9 +83,14 @@ def test_writable_mode_ingests():
     assert engine.ingested == [("물질대사", 1)]
 
 
+def test_projects_auth_required():
+    client, _ = _client(readonly=False)
+    assert client.get("/projects").status_code == 401
+    assert client.get("/projects", headers=h("nope")).status_code == 401
+
+
 def test_projects_endpoint():
-    app = create_app(StubEngine(), CORPUS, KEY_MAP, ["*"], readonly=False)
-    with TestClient(app) as c:
-        r = c.get("/projects", headers={"X-API-Key": "demo-bio"})
+    client, _ = _client(readonly=False)
+    r = client.get("/projects", headers=h())
     assert r.status_code == 200
     assert r.json()["projects"][0]["project"] == "P-BIO"
