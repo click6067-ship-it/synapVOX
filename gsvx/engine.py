@@ -14,11 +14,27 @@ from datetime import datetime, timedelta, timezone
 from neo4j import AsyncGraphDatabase
 from openai import OpenAI
 
+from pydantic import BaseModel
+
 from graphiti_core import Graphiti
 from graphiti_core.nodes import EpisodeType
 from graphiti_core.llm_client.openai_client import OpenAIClient
 from graphiti_core.llm_client.config import LLMConfig
 from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
+
+
+class Concept(BaseModel):
+    """강의에서 다루는 학술 개념·기법·이론·용어. 고유명사가 아니어도, 추상적이어도
+    반드시 추출한다(개념 지도에 올릴 만한 것이면 모두). 이 프로젝트의 그래프는 세션을
+    가로지르는 '개념 연결'이 핵심이므로, 개념은 애매해도 건너뛰지 말고 추출한다.
+    GOOD 예시: 손실 함수, 경사 하강법, 역전파, 가중치, 활성화 함수, 순전파, 과적합,
+    정규화, 배치 정규화, 어텐션, 셀프 어텐션, 특징 맵, 임베딩, 합성곱, 풀링,
+    ATP, NADH, 해당과정, 광합성, 전자전달계, 시트르산 회로, 발효, 효소.
+    BAD 예시(추출 금지): 오늘, 다음 시간, 우리, 것, 문제(맥락 없는 일반어)."""
+
+
+# 기본 Entity(named 편향, "애매하면 추출 안 함")에 더해 개념형을 추가 → 추상 개념도 추출.
+CONCEPT_ENTITY_TYPES = {"Concept": Concept}
 
 EXTRACT_MODEL = os.environ.get("GRAPHITI_MODEL", "gpt-5.5")        # Graphiti 기본·최상위(엔티티/관계 추출)
 ANSWER_MODEL = os.environ.get("ANSWER_MODEL", "gpt-5.6-sol")       # 최상위(RAG 답변, temperature 미전송)
@@ -56,7 +72,8 @@ class GraphitiEngine:
         ref = BASE_DATE + timedelta(days=seq or 0)
         r = await self.g.add_episode(
             name=title, episode_body=text, source=EpisodeType.text,
-            source_description="SynapVox 강의", reference_time=ref, group_id=project)
+            source_description="SynapVox 강의", reference_time=ref, group_id=project,
+            entity_types=CONCEPT_ENTITY_TYPES)   # 추상 개념도 추출되도록 개념형 추가
         n_ent = len(getattr(r, "nodes", []) or [])
         n_edge = len(getattr(r, "edges", []) or [])
         return {
