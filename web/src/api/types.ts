@@ -37,3 +37,13 @@ export type SessionDetail = {
   text?: string
   concepts: { id: string; label: string }[]
 }
+
+// /ask 전체 응답 — 백엔드(gsvx/engine.ask)가 answer 외에 근거(hits)와 확장
+// 서브그래프(expansion)까지 돌려준다. UI(AnswerDrawer)는 hits로 근거 세션을,
+// expansion.nodes[].id로 그래프 임시 하이라이트를 만든다. hits/edges는 렌더 시
+// 방어적으로 읽으므로 경계 타입은 unknown[]로 둔다.
+export type AskResult = {
+  answer: string
+  hits: unknown[]
+  expansion: { nodes: { id: string }[]; edges: unknown[] }
+}

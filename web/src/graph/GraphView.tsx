@@ -21,9 +21,35 @@ import { mapGraph } from './mapGraph'
 import { buildForceData, type FNode, type FLink } from './buildForceData'
 import { loadPositions, savePositions } from './positionCache'
 import { nodeRadius, nodeCoreColor, linkColor } from './render'
+import { labelOpacity } from './lod'
 
 const CANVAS_BG = '#07120F' // literal hex — canvas ctx can't read a CSS var
+const LABEL_INK = '#F4F0E7' // paper ink — readable label color on the dark canvas
+// Canvas ctx can't resolve `var(--font-ui)`; use the literal Atkinson stack.
+const LABEL_FONT = "'Atkinson Hyperlegible', system-ui, sans-serif"
 const COLD_START_MS = 6000 // Render free tier can cold-start ~50s; reassure after this
+
+// A link endpoint is a string id before the sim runs and a node object after
+// d3-force resolves it in place — normalize to the id either way.
+function endpointId(end: unknown): string {
+  return typeof end === 'object' && end !== null ? String((end as { id: unknown }).id) : String(end)
+}
+
+// Re-color a token color (hex or rgba) to a target alpha for hover dimming.
+function withAlpha(color: string, alpha: number): string {
+  if (color.startsWith('#')) {
+    const r = parseInt(color.slice(1, 3), 16)
+    const g = parseInt(color.slice(3, 5), 16)
+    const b = parseInt(color.slice(5, 7), 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+  const m = color.match(/rgba?\(([^)]+)\)/)
+  if (m) {
+    const [r, g, b] = m[1].split(',').map((s) => parseFloat(s.trim()))
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+  return `rgba(216, 255, 106, ${alpha})` // fallback = node-core lime
+}
 
 type GraphData = { nodes: FNode[]; links: FLink[] }
 type FGRef = ForceGraphMethods<NodeObject<FNode>, LinkObject<FNode, FLink>>
@@ -51,11 +77,25 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const fgRef = useRef<FGRef | undefined>(undefined)
   const didFitRef = useRef(false)
 
+  // ── Hover highlight (Task 7) + LOD label (Task 8) state, kept in refs so the
+  // canvas accessors read live values without re-creating (stable identity → no
+  // ForceGraph re-init → physics untouched). A single `hover` state bump drives
+  // the tooltip + one re-render tick so the accessors are re-read.
+  const dataRef = useRef<GraphData | null>(null)
+  const maxDegreeRef = useRef(1)
+  const hoverIdRef = useRef<string | null>(null)
+  const selectedIdRef = useRef<string | null>(null)
+  const highlightNodesRef = useRef<Set<string>>(new Set())
+  const highlightLinksRef = useRef<Set<FLink>>(new Set())
+  const pointerRef = useRef({ x: 0, y: 0 })
+  const tooltipRef = useRef<HTMLDivElement | null>(null)
+
   const [dims, setDims] = useState({ w: 0, h: 0 })
   const [status, setStatus] = useState<Status>('loading')
   const [coldStart, setColdStart] = useState(false)
   const [errMsg, setErrMsg] = useState('')
   const [data, setData] = useState<GraphData | null>(null)
+  const [hover, setHover] = useState<FNode | null>(null) // hovered node → tooltip + tick
 
   // Task 9 seam — nothing exposed yet (growWith is optional / undefined).
   useImperativeHandle(ref, () => ({}), [])
@@ -99,6 +139,8 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
             }
           }
         }
+        dataRef.current = built
+        maxDegreeRef.current = built.nodes.reduce((m, n) => Math.max(m, n.degree), 1)
         setData(built)
         setStatus('ready')
         onGraphMeta?.({ nodes: built.nodes.length, edges: built.links.length, settled: false })
@@ -153,16 +195,28 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
 
   // ── Draw helpers ──────────────────────────────────────────────────────────
   const drawNode = useCallback(
-    (node: NodeObject<FNode>, ctx: CanvasRenderingContext2D, _globalScale: number) => {
+    (node: NodeObject<FNode>, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const degree = node.degree ?? 0
       const r = nodeRadius(degree, node.type)
       const color = nodeCoreColor(node.type, node.bridge ?? false)
       const x = node.x ?? 0
       const y = node.y ?? 0
 
+      // Hover focus/dim (Task 7): focused = 1, 1-hop neighbor = 0.95, others 0.12.
+      const hoverId = hoverIdRef.current
+      const hovering = hoverId !== null
+      let nodeAlpha = 1
+      if (hovering) {
+        if (node.id === hoverId) nodeAlpha = 1
+        else if (highlightNodesRef.current.has(node.id)) nodeAlpha = 0.95
+        else nodeAlpha = 0.12
+      }
+
       ctx.save()
+      ctx.globalAlpha = nodeAlpha
       // Degree-based glow: hubs bloom more, capped so a super-hub doesn't flare.
-      ctx.shadowBlur = Math.min(6 + degree * 1.5, 24)
+      // Dim the glow on backgrounded nodes so the focus reads clearly.
+      ctx.shadowBlur = Math.min(6 + degree * 1.5, 24) * (nodeAlpha < 0.5 ? 0.3 : 1)
       ctx.shadowColor = color
       ctx.beginPath()
       ctx.arc(x, y, r, 0, 2 * Math.PI)
@@ -170,7 +224,31 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       ctx.fill()
       ctx.restore()
 
-      // LOD labels: Task 8 (draw node.label here with zoom/degree-based opacity).
+      // LOD labels: Task 8. Opacity only — the label position never changes, so
+      // fading it in/out never shifts layout.
+      const isFocused = node.id === hoverId || node.id === selectedIdRef.current
+      // Session labels only when hovered/selected; concept labels ramp by zoom.
+      const lodAlpha =
+        node.type === 'session'
+          ? isFocused
+            ? 1
+            : 0
+          : labelOpacity(globalScale, degree, maxDegreeRef.current, isFocused)
+      // Backgrounded nodes' labels dim with them (so only the focus set reads).
+      const labelAlpha = lodAlpha * (hovering ? nodeAlpha : 1)
+      if (labelAlpha > 0.02) {
+        const fontSize = 12 / globalScale // constant on-screen size (canvas is zoom-scaled)
+        ctx.save()
+        ctx.globalAlpha = labelAlpha
+        ctx.font = `${fontSize}px ${LABEL_FONT}`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'top'
+        ctx.shadowColor = 'rgba(7, 18, 15, 0.9)' // canvas-dark halo for legibility
+        ctx.shadowBlur = 3
+        ctx.fillStyle = LABEL_INK
+        ctx.fillText(node.label, x, y + r + 2 / globalScale)
+        ctx.restore()
+      }
     },
     [],
   )
@@ -187,11 +265,52 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   )
 
   // ── Interaction ─────────────────────────────────────────────────────────
-  // Task 7 seam: build highlight/dim sets from _node.neighbors here.
-  const handleNodeHover = useCallback((_node: NodeObject<FNode> | null) => {}, [])
+  // Task 7: on hover, build the highlight set (node + its neighbors) and the
+  // incident-link set into refs, then bump `hover` state for one re-render tick
+  // (also drives the tooltip). onNodeHover(null) → clear. NO physics re-run.
+  const handleNodeHover = useCallback((node: NodeObject<FNode> | null) => {
+    const hlNodes = new Set<string>()
+    const hlLinks = new Set<FLink>()
+    if (node) {
+      hlNodes.add(node.id)
+      if (node.neighbors) for (const nb of node.neighbors) hlNodes.add(nb)
+      for (const l of dataRef.current?.links ?? []) {
+        if (endpointId(l.source) === node.id || endpointId(l.target) === node.id) hlLinks.add(l)
+      }
+    }
+    highlightNodesRef.current = hlNodes
+    highlightLinksRef.current = hlLinks
+    hoverIdRef.current = node ? node.id : null
+    setHover(node ? (node as FNode) : null)
+  }, [])
+
+  // Track pointer inside the canvas so the tooltip can float at the cursor.
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const el = wrapRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    pointerRef.current = { x, y }
+    const tt = tooltipRef.current
+    if (tt) {
+      tt.style.left = `${x + 14}px`
+      tt.style.top = `${y + 14}px`
+    }
+  }, [])
+
+  // Hover-aware link color (Task 7): incident edges bright (~0.8), others faint.
+  const linkColorAccessor = useCallback((l: LinkObject<FNode, FLink>) => {
+    const base = linkColor(l.relClass)
+    if (hoverIdRef.current === null) return base
+    return highlightLinksRef.current.has(l as unknown as FLink)
+      ? withAlpha(base, 0.8)
+      : withAlpha(base, 0.05)
+  }, [])
 
   const handleNodeClick = useCallback(
     (node: NodeObject<FNode>) => {
+      selectedIdRef.current = node.id // keep its label shown (session labels need this)
       onSelectNode?.(node as FNode)
     },
     [onSelectNode],
@@ -226,6 +345,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   return (
     <div
       ref={wrapRef}
+      onMouseMove={handleMouseMove}
       style={{ position: 'relative', width: '100%', height: '100%', background: CANVAS_BG, overflow: 'hidden' }}
     >
       {showGraph && data && (
@@ -242,7 +362,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
           onNodeDragEnd={handleDragEnd}
           nodeCanvasObject={drawNode}
           nodePointerAreaPaint={paintPointer}
-          linkColor={(l: LinkObject<FNode, FLink>) => linkColor(l.relClass)}
+          linkColor={linkColorAccessor}
           linkWidth={(l: LinkObject<FNode, FLink>) =>
             l.relClass === 'next' || l.relClass === 'continues' ? 1.6 : l.relClass === 'mentions' ? 0.6 : 1
           }
@@ -252,6 +372,34 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
           onEngineStop={handleEngineStop}
         />
       )}
+
+      {/* Floating hover tooltip (Task 7): label + type + 연결 N; follows the
+          cursor via handleMouseMove; hidden (display:none) when not hovering. */}
+      <div
+        ref={tooltipRef}
+        style={{
+          position: 'absolute',
+          left: pointerRef.current.x + 14,
+          top: pointerRef.current.y + 14,
+          display: hover ? 'block' : 'none',
+          pointerEvents: 'none',
+          zIndex: 5,
+          maxWidth: 220,
+          padding: '6px 8px',
+          background: 'rgba(7, 18, 15, 0.92)',
+          border: '1px solid #16241f',
+          color: '#F4F0E7',
+        }}
+      >
+        {hover && (
+          <>
+            <div style={tooltipLabel}>{hover.label}</div>
+            <div style={tooltipMeta}>
+              {hover.type === 'session' ? '세션' : '개념'} · 연결 {hover.degree}
+            </div>
+          </>
+        )}
+      </div>
 
       {(status === 'loading' || status === 'error' || isEmpty) && (
         <Overlay>
@@ -315,6 +463,19 @@ const overlaySub: React.CSSProperties = {
   fontSize: 14,
   color: '#9aa39c',
   maxWidth: 360,
+}
+
+const tooltipLabel: React.CSSProperties = {
+  fontFamily: 'var(--font-ui)',
+  fontSize: 13,
+  lineHeight: 1.3,
+  fontWeight: 600,
+}
+const tooltipMeta: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 11,
+  color: '#9aa39c',
+  marginTop: 2,
 }
 
 export default GraphView

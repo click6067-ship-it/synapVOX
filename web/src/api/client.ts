@@ -1,4 +1,4 @@
-import type { ConceptDetail, GraphData, Project, SessionDetail } from './types'
+import type { AskResult, ConceptDetail, GraphData, Project, SessionDetail } from './types'
 
 const BASE = (import.meta.env.VITE_API_BASE ?? 'https://synapvox-graphiti.onrender.com').replace(/\/$/, '')
 const KEY = import.meta.env.VITE_API_KEY ?? 'demo-bio'
@@ -61,10 +61,13 @@ export async function getGraph(project: string): Promise<GraphData> {
   return (await jsonOrThrow(await req(`/graph?project=${encodeURIComponent(project)}`))) as GraphData
 }
 
-export async function ask(project: string, q: string): Promise<{ answer: string }> {
-  return (await jsonOrThrow(await req(`/ask?project=${encodeURIComponent(project)}&q=${encodeURIComponent(q)}&k=6`))) as {
-    answer: string
-  }
+/** Returns the FULL backend body — `answer` plus `hits` (근거 세션) and
+ * `expansion` (RAG subgraph for temporary graph highlight). Backward compatible:
+ * callers that only read `.answer` still work. */
+export async function ask(project: string, q: string): Promise<AskResult> {
+  return (await jsonOrThrow(
+    await req(`/ask?project=${encodeURIComponent(project)}&q=${encodeURIComponent(q)}&k=6`),
+  )) as AskResult
 }
 
 export async function ingestText(project: string, title: string, text: string): Promise<unknown> {

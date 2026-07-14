@@ -1,0 +1,438 @@
+/* Sidebar — the paper "spine" of Archive Graph Studio.
+   Editorial / library-catalog vocabulary: hairline rules, mono numerals, flat
+   filing "slips" with a session-red tab. No rounded cards, no shadows except a
+   single hard printerly offset on the switcher popover. Consumes tokens.css. */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-4);
+  gap: var(--space-4);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+.sidebar--collapsed {
+  padding: var(--space-4) var(--space-2);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+/* ── Brand ─────────────────────────────────────────────── */
+.sidebar__brand {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.sidebar--collapsed .sidebar__brand {
+  flex-direction: column;
+  align-items: center;
+}
+.sidebar__id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sidebar__wordmark {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.sidebar__wordmark--mono {
+  font-size: 19px;
+}
+.sidebar__wordmark-v {
+  color: var(--session-red);
+}
+.sidebar__kicker {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+
+.sidebar__collapse {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--sub);
+  background: transparent;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  transition: border-color var(--dur-ui) ease, color var(--dur-ui) ease;
+}
+.sidebar__collapse:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+/* ── ＋ Add lecture ─────────────────────────────────────── */
+.sidebar__add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 9px 12px;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--ink);
+  border-radius: var(--r-1);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background var(--dur-ui) ease, color var(--dur-ui) ease;
+}
+.sidebar__add-plus {
+  color: var(--session-red);
+  font-size: 14px;
+  line-height: 1;
+  transition: color var(--dur-ui) ease;
+}
+.sidebar__add:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+.sidebar__add:hover .sidebar__add-plus {
+  color: var(--node-core); /* lime pops on ink */
+}
+.sidebar__add--icon {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  gap: 0;
+}
+
+/* ── Section label (SESSIONS · n) ──────────────────────── */
+.sidebar__seclabel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.sidebar__seccount {
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+/* ── Slips column (scrolls) ────────────────────────────── */
+.sidebar__slips {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 0 var(--space-1);
+}
+.sidebar--collapsed .sidebar__slips {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Foot (stats) ──────────────────────────────────────── */
+.sidebar__foot {
+  flex: 0 0 auto;
+}
+.sidebar--collapsed .sidebar__foot {
+  width: 100%;
+}
+
+/* ============================================================
+   ProjectSwitcher
+   ============================================================ */
+.projectswitcher {
+  position: relative;
+  width: 100%;
+}
+.projectswitcher--collapsed {
+  display: flex;
+  justify-content: center;
+}
+.projectswitcher__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  transition: border-color var(--dur-ui) ease;
+}
+.projectswitcher__trigger:hover {
+  border-color: var(--ink);
+}
+.projectswitcher__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.projectswitcher__name {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.projectswitcher__counts {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--sub);
+}
+.projectswitcher__n {
+  color: var(--ink);
+}
+.projectswitcher__chev {
+  flex: 0 0 auto;
+  font-size: 10px;
+  color: var(--sub);
+  transition: transform var(--dur-ui) ease;
+}
+.projectswitcher__chev.is-open {
+  transform: rotate(180deg);
+}
+.projectswitcher__monogram {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+.projectswitcher__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  margin: 0;
+  padding: var(--space-1) 0;
+  list-style: none;
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-1);
+  box-shadow: 4px 4px 0 rgba(24, 23, 19, 0.12); /* hard printerly offset, not a soft SaaS blur */
+}
+.projectswitcher__legend {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 4px var(--space-3) 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sub);
+  border-bottom: 1px solid var(--rule);
+}
+.projectswitcher__empty {
+  padding: var(--space-3);
+  font-size: 12px;
+  color: var(--sub);
+}
+.projectswitcher__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  transition: background var(--dur-ui) ease;
+}
+.projectswitcher__item:hover {
+  background: rgba(24, 23, 19, 0.05);
+}
+.projectswitcher__item.is-active {
+  border-left-color: var(--session-red);
+  background: rgba(200, 78, 58, 0.06);
+}
+.projectswitcher__itemname {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.projectswitcher__itemcounts {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--sub);
+}
+
+/* ============================================================
+   SessionList — lecture slips
+   ============================================================ */
+.sessionlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sessionlist__empty {
+  margin: var(--space-2) 0 0;
+  font-size: 12.5px;
+  color: var(--sub);
+}
+
+.slip {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2);
+  border-left: 2px solid var(--session-red); /* the filing tab (signature) */
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--r-0);
+  transition: background var(--dur-ui) ease, border-left-width var(--dur-ui) ease;
+}
+.slip:hover {
+  background: rgba(24, 23, 19, 0.045);
+  border-left-width: 4px;
+}
+.slip:focus-visible {
+  outline: 2px solid var(--rule-blue);
+  outline-offset: -2px;
+}
+.slip__seq {
+  flex: 0 0 auto;
+  min-width: 2.2ch;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--sub);
+}
+.slip__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Collapsed → column of session-red dots */
+.sessionlist--collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-1);
+}
+.sessionlist__dotwrap {
+  display: flex;
+  justify-content: center;
+}
+.slip__dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--session-red);
+  transition: transform var(--dur-ui) ease, box-shadow var(--dur-ui) ease;
+}
+.slip__dot:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px rgba(47, 111, 134, 0.28); /* rule-blue focus ring */
+}
+
+/* ============================================================
+   GraphStats — s · c · e, mono, foot of sidebar
+   ============================================================ */
+.graphstats {
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+  color: var(--sub);
+}
+.graphstats__n {
+  color: var(--ink);
+  font-weight: 500;
+}
+.graphstats__sep {
+  color: var(--rule);
+}
+
+.graphstats--collapsed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--rule);
+}
+.graphstats__pair {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0;
+}
+.graphstats__unit {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+.graphstats__pair .graphstats__n {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+/* Thin, unobtrusive scrollbars (paper) */
+.sidebar__slips::-webkit-scrollbar,
+.projectswitcher__menu::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar__slips::-webkit-scrollbar-thumb,
+.projectswitcher__menu::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: var(--r-1);
+}
