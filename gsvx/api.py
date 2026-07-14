@@ -50,6 +50,12 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
                 "embed_model": engine.embed_model, "engine": "graphiti",
                 "extract_model": engine.extract_model, "readonly": readonly}
 
+    @app.get("/projects")
+    async def projects(x_api_key: str | None = Header(None, alias="X-API-Key")):
+        if not x_api_key or hashlib.sha256(x_api_key.encode()).hexdigest() not in key_map:
+            raise HTTPException(401, "invalid API key")
+        return {"projects": await engine.list_projects()}
+
     @app.get("/corpus")
     async def corpus_list(pid: str = Depends(project_id)):
         ingested = {r["name"] for r in await engine.sessions_in(pid)}

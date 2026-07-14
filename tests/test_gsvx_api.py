@@ -39,6 +39,9 @@ class StubEngine:
     async def reset(self, pid):
         self.reset_called = True
 
+    async def list_projects(self):
+        return [{"project": "P-BIO", "sessions": 2, "concepts": 5}]
+
 
 def _client(readonly):
     engine = StubEngine()
@@ -78,3 +81,11 @@ def test_writable_mode_ingests():
     r = client.post("/ingest", json={"session_key": "S1"}, headers=h())
     assert r.status_code == 200 and r.json()["session_key"] == "S1"
     assert engine.ingested == [("물질대사", 1)]
+
+
+def test_projects_endpoint():
+    app = create_app(StubEngine(), CORPUS, KEY_MAP, ["*"], readonly=False)
+    with TestClient(app) as c:
+        r = c.get("/projects", headers={"X-API-Key": "demo-bio"})
+    assert r.status_code == 200
+    assert r.json()["projects"][0]["project"] == "P-BIO"

@@ -214,3 +214,15 @@ class GraphitiEngine:
 
     async def sessions_in(self, project):
         return await self._read("MATCH (e:Episodic {group_id:$g}) RETURN e.name AS name", g=project)
+
+    async def list_projects(self):
+        rows = await self._read(
+            "MATCH (e:Episodic) WITH e.group_id AS project, count(e) AS sessions "
+            "RETURN project, sessions ORDER BY project")
+        out = []
+        for r in rows:
+            c = await self._read(
+                "MATCH (n:Entity {group_id:$g}) RETURN count(n) AS c", g=r["project"])
+            out.append({"project": r["project"], "sessions": r["sessions"],
+                        "concepts": (c[0]["c"] if c else 0)})
+        return out
