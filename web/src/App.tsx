@@ -1,11 +1,21 @@
+import { Route, Routes } from 'react-router-dom'
+import Drawer from './nav/Drawer'
+import Home from './home/Home'
+import Workspace from './workspace/Workspace'
 import './styles/tokens.css'
+import './styles/app.css'
 
 function App() {
   return (
-    <main>
-      <h1>SynapVox</h1>
-      <p style={{ color: 'var(--sub)' }}>web scaffold</p>
-    </main>
+    <div className="app-shell">
+      <Drawer />
+      <main className="app-content">
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/p/:projectId" element={<Workspace />} />
+        </Routes>
+      </main>
+    </div>
   )
 }
 
