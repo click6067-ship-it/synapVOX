@@ -1,0 +1,11 @@
+:root{
+  --bg:#0e0f13; --surface:#16181f; --surface-2:#1c1f28; --line:#272b36;
+  --ink:#e8eaf0; --sub:#9aa0b0; --faint:#6b7180;
+  --accent-conc:#3fb9a0;   /* 개념=청록 */
+  --accent-sess:#7c8cf0;   /* 세션=인디고 */
+  --edge:#3a4050; --danger:#e0674a;
+  --mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+  --sans:'Pretendard',system-ui,'Apple SD Gothic Neo',sans-serif;
+  --radius:14px; --shadow:0 8px 30px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans)}
