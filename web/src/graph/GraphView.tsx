@@ -67,13 +67,15 @@ export type GraphViewProps = {
   reloadKey?: number // bump → refetch
   onSelectNode?: (n: FNode) => void
   onGraphMeta?: (m: { nodes: number; edges: number; settled: boolean }) => void
-  askExpansionIds?: Set<string> | null // temp RAG highlight (wired in Task 12)
+  onSessions?: (sessions: FNode[]) => void // session nodes → sidebar list
+  highlightId?: string | null // external highlight (e.g. sidebar hover) → same focus/dim as hover
+  askExpansionIds?: Set<string> | null // P2 seam: temp RAG expansion subgraph highlight
 }
 
 type Status = 'loading' | 'error' | 'ready'
 
 export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function GraphView(props, ref) {
-  const { project, reloadKey, onGraphMeta, onSelectNode } = props
+  const { project, reloadKey, onGraphMeta, onSelectNode, onSessions, highlightId } = props
 
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const fgRef = useRef<FGRef | undefined>(undefined)
@@ -196,6 +198,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
         setData(built)
         setStatus('ready')
         onGraphMeta?.({ nodes: built.nodes.length, edges: built.links.length, settled: false })
+        onSessions?.(built.nodes.filter((n) => n.type === 'session'))
       })
       .catch((e: unknown) => {
         if (cancelled) return
@@ -335,6 +338,18 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
     hoverIdRef.current = node ? node.id : null
     setHover(node ? (node as FNode) : null)
   }, [])
+
+  // External highlight (sidebar hover): drive the same focus/dim as a mouse hover.
+  // Only fires when `highlightId` changes, so it never clobbers an active mouse
+  // hover (the pointer is over the sidebar, not the canvas, when this changes).
+  useEffect(() => {
+    if (highlightId == null) {
+      handleNodeHover(null)
+      return
+    }
+    const node = dataRef.current?.nodes.find((n) => n.id === highlightId)
+    if (node) handleNodeHover(node as NodeObject<FNode>)
+  }, [highlightId, handleNodeHover])
 
   // Track pointer inside the canvas so the tooltip can float at the cursor.
   const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {

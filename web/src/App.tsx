@@ -1,33 +1,13 @@
 import { Route, Routes } from 'react-router-dom'
-import Drawer from './nav/Drawer'
-import Home from './home/Home'
-import Workspace from './workspace/Workspace'
-import { GraphView } from './graph/GraphView'
-import './styles/tokens.css'
-import './styles/app.css'
+import GraphPage from './pages/GraphPage'
 
-function App() {
+// Both routes render the graph app. `/` resolves to the first project;
+// `/p/:projectId` targets a specific one. GraphPage owns the full-screen shell.
+export default function App() {
   return (
-    <div className="app-shell">
-      <Drawer />
-      <main className="app-content">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/p/:projectId" element={<Workspace />} />
-          {/* Temporary dev route (Task 6): verify graph elasticity against the
-              live backend. Full App wiring happens in Task 14. */}
-          <Route
-            path="/dev/graph"
-            element={
-              <div style={{ position: 'fixed', inset: 0 }}>
-                <GraphView project="P-BIO" />
-              </div>
-            }
-          />
-        </Routes>
-      </main>
-    </div>
+    <Routes>
+      <Route path="/" element={<GraphPage />} />
+      <Route path="/p/:projectId" element={<GraphPage />} />
+    </Routes>
   )
 }
-
-export default App

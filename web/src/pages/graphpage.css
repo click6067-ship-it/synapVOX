@@ -1,0 +1,22 @@
+/* GraphPage — HUD + canvas states over the graph. */
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 3;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: #6f7d74; /* muted, reads on the dark canvas */
+  pointer-events: none;
+  user-select: none;
+}
+.canvas-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #9aa39c;
+  font-family: var(--font-ui);
+  font-size: 14px;
+}
