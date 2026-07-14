@@ -66,7 +66,7 @@ class GraphitiEngine:
             "pipeline": [
                 {"step": "에피소드 생성", "count": 1},
                 {"step": "임베딩", "count": 1},
-                {"step": "엔티티 추출 (Graphiti·gpt-5.4)", "count": n_ent},
+                {"step": f"엔티티 추출 (Graphiti·{EXTRACT_MODEL})", "count": n_ent},
                 {"step": "관계 추출 (fact)", "count": n_edge},
                 {"step": "그래프 반영 (Neo4j)", "count": n_ent + n_edge},
             ],
