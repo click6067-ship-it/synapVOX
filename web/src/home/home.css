@@ -1,0 +1,291 @@
+/* Home = the main page (Daglo-style: no separate hero section — input+tiles+recent
+   IS the page). Colors/type pull from tokens.css; no ad hoc palette. */
+
+.home {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 56px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+/* ---- headline ---- */
+.home-hero {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.home-kicker {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--faint);
+  text-transform: uppercase;
+}
+.home-headline {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.home-headline-accent {
+  color: var(--accent-conc);
+}
+
+/* ---- create input ---- */
+.create-input {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+.create-input-text {
+  width: 100%;
+  min-height: 168px;
+  resize: vertical;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.6;
+  padding: 14px;
+}
+.create-input-text::placeholder {
+  color: var(--faint);
+}
+.create-input-text:focus,
+.create-input-title:focus {
+  outline: none;
+  border-color: var(--accent-conc);
+}
+.create-input-text:disabled,
+.create-input-title:disabled {
+  opacity: 0.6;
+}
+
+.create-input-row {
+  display: flex;
+  gap: 10px;
+}
+.create-input-title {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  padding: 11px 12px;
+}
+.create-input-title::placeholder {
+  color: var(--faint);
+}
+
+.create-input-submit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px;
+  border-radius: 10px;
+  border: none;
+  background: var(--accent-conc);
+  color: #06231d;
+  font: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.create-input-submit:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.create-input-submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.create-input-spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(6, 35, 29, 0.35);
+  border-top-color: #06231d;
+  animation: create-input-spin 0.7s linear infinite;
+}
+@keyframes create-input-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.create-input-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+/* ---- action tiles ---- */
+.action-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.action-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 18px 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--sub);
+  font: inherit;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+}
+.action-tile:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+  border-color: var(--accent-conc);
+}
+.action-tile-icon {
+  display: inline-flex;
+  color: var(--sub);
+}
+.action-tile:hover .action-tile-icon {
+  color: var(--accent-conc);
+}
+.action-tile-icon--sess {
+  color: var(--accent-sess);
+}
+.action-tile-icon--conc {
+  color: var(--accent-conc);
+}
+.action-tile--placeholder {
+  cursor: default;
+  opacity: 0.5;
+}
+.action-tile--placeholder:hover {
+  background: var(--surface);
+  color: var(--sub);
+  border-color: var(--line);
+}
+.action-tile--placeholder:hover .action-tile-icon {
+  color: var(--sub);
+}
+
+/* ---- recent projects ---- */
+.home-recent {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.home-section-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sub);
+}
+.project-grid-status {
+  margin: 0;
+  color: var(--sub);
+  font-size: 14px;
+}
+.project-grid-empty {
+  padding: 18px;
+  background: var(--surface);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.project-grid-retry {
+  margin-top: 8px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.project-grid-retry:hover {
+  border-color: var(--accent-conc);
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+.project-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.project-card:hover {
+  background: var(--surface-2);
+  border-color: var(--accent-conc);
+}
+.project-card-name {
+  font-family: var(--mono);
+  font-size: 14px;
+  word-break: break-all;
+}
+.project-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sub);
+  font-size: 12px;
+}
+.project-card-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--faint);
+}
+
+/* ---- narrow screens ---- */
+@media (max-width: 640px) {
+  .home {
+    padding: 40px 16px 48px;
+    gap: 28px;
+  }
+  .home-headline {
+    font-size: 26px;
+  }
+  .action-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .create-input-row {
+    flex-wrap: wrap;
+  }
+  .create-input-submit {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 18px;
+  }
+}
