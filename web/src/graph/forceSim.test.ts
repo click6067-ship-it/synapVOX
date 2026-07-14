@@ -16,18 +16,37 @@ describe('forceSim', () => {
     expect(d1).toBeGreaterThan(d0);
   });
 
-  it('스프링으로 링크된 노드가 서로 가까워진다', () => {
-    const sim = initSim(
-      [
-        { id: 'a', type: 'session', x: 0, y: 280, vx: 0, vy: 0, px: null, py: null },
-        { id: 'b', type: 'concept', x: 500, y: 280, vx: 0, vy: 0, px: null, py: null },
-      ],
-      [{ a: 0, b: 1 }],
+  it('스프링으로 링크된 노드가 SPRING_REST 근처로 수렴한다', () => {
+    // center gravity alone (no spring) would collapse both nodes to the
+    // canvas center, so a naive "d1 < d0" check passes even with no spring
+    // at all. Run enough steps to reach steady state and assert the
+    // linked-pair distance converges toward SPRING_REST (~74), not to ~0.
+    const makeNodes = () => [
+      { id: 'a', type: 'session' as const, x: 0, y: 280, vx: 0, vy: 0, px: null, py: null },
+      { id: 'b', type: 'concept' as const, x: 500, y: 280, vx: 0, vy: 0, px: null, py: null },
+    ];
+
+    const spring = initSim(makeNodes(), [{ a: 0, b: 1 }]);
+    for (let i = 0; i < 200; i++) stepSim(spring, 960, 560);
+    const dSpring = Math.hypot(
+      spring.nodes[0].x - spring.nodes[1].x,
+      spring.nodes[0].y - spring.nodes[1].y,
     );
-    const d0 = Math.hypot(sim.nodes[0].x - sim.nodes[1].x, sim.nodes[0].y - sim.nodes[1].y);
-    for (let i = 0; i < 30; i++) stepSim(sim, 960, 560);
-    const d1 = Math.hypot(sim.nodes[0].x - sim.nodes[1].x, sim.nodes[0].y - sim.nodes[1].y);
-    expect(d1).toBeLessThan(d0);
+    expect(dSpring).toBeGreaterThan(60);
+    expect(dSpring).toBeLessThan(90);
+
+    // Baseline: no links at all — gravity alone collapses the pair much
+    // closer than SPRING_REST. If the spring force were broken/removed,
+    // dSpring would drop to roughly this baseline and the assertions above
+    // would fail.
+    const baseline = initSim(makeNodes(), []);
+    for (let i = 0; i < 200; i++) stepSim(baseline, 960, 560);
+    const dBaseline = Math.hypot(
+      baseline.nodes[0].x - baseline.nodes[1].x,
+      baseline.nodes[0].y - baseline.nodes[1].y,
+    );
+    expect(dBaseline).toBeLessThan(dSpring);
+    expect(dBaseline).toBeLessThan(60);
   });
 
   it('px/py가 지정된 노드는 고정된다(핀)', () => {

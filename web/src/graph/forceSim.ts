@@ -23,7 +23,6 @@ export type Sim = {
 
 // Physics constants (tuned for a ~960x560 canvas of session/concept nodes).
 const GRAVITY = 0.01; // pull toward center per step
-const GRAVITY_CY = 280; // target y for center gravity (fixed, not H/2)
 const REPULSE_STRENGTH = 620; // numerator of 1/d^2 repulsion
 const REPULSE_MAX_D2 = 24000; // only repel nearby nodes (perf + locality)
 const SPRING_REST = 74; // resting length for linked nodes
@@ -45,7 +44,7 @@ export function stepSim(sim: Sim, W: number, H: number): void {
   const { nodes, links } = sim;
   const n = nodes.length;
   const cx = W / 2;
-  const cy = GRAVITY_CY;
+  const cy = H / 2;
 
   // 1) center gravity — pulls every node toward (cx, cy).
   for (let i = 0; i < n; i++) {
