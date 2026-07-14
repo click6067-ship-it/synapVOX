@@ -170,6 +170,27 @@ def test_ingest_text_within_caps_succeeds():
     assert engine.ingested == [("붙여넣은 강의", 4)]  # seq = n+1
 
 
+def test_write_rate_limit_per_ip():
+    # 창당 IP별 30회까지 허용, 31회째 429 — 반복 ingest 비용폭주 방어.
+    client, engine = _client(readonly=False)
+    engine.sessions_count = 1  # 기존 프로젝트 append (프로젝트 캡 검사 스킵)
+    for i in range(30):
+        r = client.post("/ingest-text", json={"text": "x"}, headers=h())
+        assert r.status_code == 200, f"call {i} → {r.status_code}"
+    r = client.post("/ingest-text", json={"text": "x"}, headers=h())
+    assert r.status_code == 429
+
+
+def test_rate_limit_is_app_scoped():
+    # 앱마다 별도 로그 — 한 배포의 스로틀이 다른 배포로 새지 않음(테스트 격리도 보장).
+    c1, e1 = _client(readonly=False); e1.sessions_count = 1
+    c2, e2 = _client(readonly=False); e2.sessions_count = 1
+    for _ in range(30):
+        c1.post("/ingest-text", json={"text": "x"}, headers=h())
+    assert c1.post("/ingest-text", json={"text": "x"}, headers=h()).status_code == 429
+    assert c2.post("/ingest-text", json={"text": "x"}, headers=h()).status_code == 200
+
+
 def test_reset_blocked_by_default_even_when_writable():
     # readonly=False(쓰기 가능한 배포)여도 allow_reset이 기본값(False)이면 /reset은 403 —
     # 공개 데모 키로 그룹 전체를 지우는 것을 막는 별도 게이트.

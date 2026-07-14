@@ -13,10 +13,12 @@
 
 import hashlib
 import re
+import time
+from collections import deque
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
@@ -29,6 +31,10 @@ _PROJECT_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _MAX_TEXT_CHARS = 50_000  # 한 번에 넣는 본문 상한(긴 단일 강의도 충분히 커버)
 _MAX_SESSIONS_PER_PROJECT = 40  # 프로젝트당 세션 수 상한
 _MAX_PROJECTS = 60  # 새 그룹 무한 생성 방어(신규 프로젝트 최초 ingest에서만 검사)
+# per-IP 쓰기 속도 제한 — 총량 캡(위)이 '얼마나 많이'를 막는다면 이건 '얼마나 빨리'를 막는다.
+# shipped 데모 키로 스크립트가 짧은 시간에 비싼 LLM 추출을 폭주시키는 것을 차단.
+_RATE_WINDOW_S = 3600  # 창(초)
+_RATE_MAX_WRITES = 30  # 창당 IP별 쓰기 허용 횟수(팀 데모 정상 사용에는 충분히 넉넉)
 
 
 def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_reset=False):
@@ -66,6 +72,25 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
         if not _PROJECT_RE.fullmatch(resolved):
             raise HTTPException(400, "invalid project id")
         return resolved
+
+    # per-IP 쓰기 로그(앱 스코프 — 인스턴스 재시작 시 리셋되는 best-effort 스로틀).
+    # 단일 인스턴스 데모용. 다중 인스턴스/영속이 필요하면 Redis 등으로 승격.
+    _write_log: dict[str, deque] = {}
+
+    def _client_ip(request: Request) -> str:
+        # Render 등 프록시 뒤 — 실제 클라이언트는 X-Forwarded-For 첫 홉.
+        fwd = request.headers.get("x-forwarded-for", "")
+        return fwd.split(",")[0].strip() or (request.client.host if request.client else "?")
+
+    def _rate_limit(request: Request):
+        ip = _client_ip(request)
+        now = time.time()
+        dq = _write_log.setdefault(ip, deque())
+        while dq and now - dq[0] > _RATE_WINDOW_S:
+            dq.popleft()
+        if len(dq) >= _RATE_MAX_WRITES:
+            raise HTTPException(429, "쓰기 요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.")
+        dq.append(now)
 
     def _guard_write():
         if readonly:
@@ -108,8 +133,9 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
                               "chapter": s.get("chapter", ""), "ingested": s["title"] in ingested} for s in items]}
 
     @app.post("/ingest")
-    async def ingest(body: dict, pid: str = Depends(project_id)):
+    async def ingest(body: dict, request: Request, pid: str = Depends(project_id)):
         _guard_write()
+        _rate_limit(request)
         key = body.get("session_key")
         s = corpus.get(key)
         if not s:
@@ -119,8 +145,9 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
         return out
 
     @app.post("/ingest-text")
-    async def ingest_text(body: dict, pid: str = Depends(project_id)):
+    async def ingest_text(body: dict, request: Request, pid: str = Depends(project_id)):
         _guard_write()
+        _rate_limit(request)  # per-IP 속도 제한이 신규 프로젝트 생성 빈도까지 bound한다.
         project = _resolve_project(body.get("project"), pid)
         text = (body.get("text") or "").strip()
         if not text:
@@ -131,7 +158,10 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
         n = len(await engine.sessions_in(project))
         if n >= _MAX_SESSIONS_PER_PROJECT:
             raise HTTPException(429, f"이 프로젝트의 세션 한도({_MAX_SESSIONS_PER_PROJECT})에 도달했습니다.")
-        if n == 0:  # 새 프로젝트(그룹) 생성 시점에만 총 프로젝트 수 상한 검사
+        if n == 0:  # 새 프로젝트(그룹) 생성 시점에만 총 프로젝트 수 상한 검사.
+            # 참고: check-then-act라 경계에서 동시 최초 ingest가 캡을 몇 개 넘길 수 있으나,
+            # (a) 캡은 소프트 한도이고 (b) 위 per-IP rate limit이 동시 생성 빈도를 제한하므로
+            # 단일 인스턴스 데모에서는 best-effort로 충분하다(원자화는 DB constraint 필요 → 과대).
             if len(await engine.list_projects()) >= _MAX_PROJECTS:
                 raise HTTPException(429, f"프로젝트 한도({_MAX_PROJECTS})에 도달했습니다.")
         return await engine.ingest(project, title, text, seq=n + 1)

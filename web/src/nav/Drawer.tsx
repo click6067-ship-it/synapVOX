@@ -1,6 +1,6 @@
 // Persistent left drawer nav (Daglo-style: dark, icon+label, collapsible, off-canvas on narrow screens).
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 /** Small inline-SVG icon set — no external icon library/CDN. */
 function IconGraphMark() {
@@ -74,8 +74,18 @@ function IconClose() {
 function Drawer() {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const navigate = useNavigate()
 
   const closeMobile = () => setMobileOpen(false)
+
+  // "내 프로젝트" — 홈의 최근 프로젝트 섹션으로. "새 그래프"(홈 상단 입력)와 같은 라우트라
+  // 둘 다 NavLink면 동시 active가 돼 위치 피드백이 애매해진다 → 이건 스크롤 액션으로 분리.
+  const goProjects = () => {
+    closeMobile()
+    navigate('/')
+    // 홈이 렌더된 뒤 최근 섹션으로 스크롤(다른 라우트에서 왔을 때 대비 지연).
+    setTimeout(() => document.getElementById('home-recent')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
 
   return (
     <>
@@ -110,18 +120,12 @@ function Drawer() {
             </span>
             {!collapsed && <span className="drawer-item-label">새 그래프</span>}
           </NavLink>
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `drawer-item${isActive ? ' active' : ''}`}
-            onClick={closeMobile}
-            title={collapsed ? '내 프로젝트' : undefined}
-          >
+          <button type="button" className="drawer-item" onClick={goProjects} title={collapsed ? '내 프로젝트' : undefined}>
             <span className="drawer-item-icon">
               <IconProjects />
             </span>
             {!collapsed && <span className="drawer-item-label">내 프로젝트</span>}
-          </NavLink>
+          </button>
           {/* Coming-soon: cross-project search. Deliberately NOT "AI 질문" — that
               (per-project chat) already works inside the workspace, so a disabled
               copy of it here would read as "chat unavailable". */}

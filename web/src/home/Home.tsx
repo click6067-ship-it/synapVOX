@@ -105,7 +105,7 @@ function Home() {
 
       <ActionTiles onAddText={focusInput} onLoadSample={handleLoadSample} onViewGraph={handleViewGraph} />
 
-      <section className="home-recent" ref={recentSectionRef}>
+      <section className="home-recent" id="home-recent" ref={recentSectionRef}>
         <h2 className="home-section-title">최근 프로젝트</h2>
         <ProjectGrid />
       </section>
