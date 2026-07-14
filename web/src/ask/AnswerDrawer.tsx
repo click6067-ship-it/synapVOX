@@ -23,12 +23,13 @@ function readHit(h: unknown): { session: string; text: string } {
 export function AnswerDrawer(props: {
   answer: AskResult | null
   busy: boolean
+  error?: string | null
   onClose(): void
 }): React.JSX.Element | null {
-  const { answer, busy, onClose } = props
+  const { answer, busy, error, onClose } = props
 
-  // 답도 없고 로딩도 아니면 드로어는 비어 있음 → 렌더 안 함.
-  if (!answer && !busy) return null
+  // 답도 없고 로딩도 아니고 에러도 없으면 드로어는 비어 있음 → 렌더 안 함.
+  if (!answer && !busy && !error) return null
 
   const hits = (answer?.hits ?? []).map(readHit).filter((h) => h.session || h.text)
 
@@ -41,7 +42,9 @@ export function AnswerDrawer(props: {
         </button>
       </header>
 
-      {busy && !answer ? (
+      {error && !busy ? (
+        <p className="answer-drawer__error" role="alert">{error}</p>
+      ) : busy && !answer ? (
         <p className="answer-drawer__pending">그래프에서 근거를 찾는 중…</p>
       ) : (
         <div className="answer-drawer__body">

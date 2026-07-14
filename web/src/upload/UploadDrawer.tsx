@@ -104,7 +104,15 @@ export function UploadDrawer(props: {
       <aside className="upload__panel">
         <header className="upload__head">
           <h2 className="upload__title">{heading}</h2>
-          <button type="button" className="upload__close" onClick={onClose} aria-label="닫기">
+          {/* Disabled during an in-flight ingest so the request/state machine
+              isn't unmounted mid-flight (backdrop is already guarded). */}
+          <button
+            type="button"
+            className="upload__close"
+            onClick={onClose}
+            disabled={busy}
+            aria-label="닫기"
+          >
             ×
           </button>
         </header>

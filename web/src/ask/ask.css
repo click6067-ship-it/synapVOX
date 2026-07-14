@@ -125,6 +125,14 @@
   color: var(--sub);
   font-style: italic;
 }
+.answer-drawer__error {
+  margin: var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--session-red);
+  border-radius: var(--r-1);
+  color: var(--session-red);
+  font-size: 14px;
+}
 
 .answer-drawer__section + .answer-drawer__section {
   margin-top: var(--space-6);

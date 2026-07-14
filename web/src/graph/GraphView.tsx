@@ -132,6 +132,9 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
     // New top-level object → ForceGraph2D re-binds graphData. Because the existing
     // node OBJECTS are reused, d3 preserves their positions/velocities (no jump).
     setData(nextData)
+    // The reheat below re-settles the newcomer → HUD reads "settling…" until
+    // handleEngineStop flips it back to settled.
+    onGraphMeta?.({ nodes: nextData.nodes.length, edges: nextData.links.length, settled: false })
 
     // Revive + calm reheat AFTER ForceGraph re-binds the new data (next frame).
     // cooldownTicks stays 200 → the graph re-CALMS, it does not re-freeze dead.
@@ -150,7 +153,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       .find((n) => n?.type === 'session')
     const ringNodeId = sessionNew?.id ?? merged.anchorId ?? merged.addedNodeIds[0] ?? null
     if (ringNodeId) setPulse({ id: ++pulseCounterRef.current, nodeId: ringNodeId })
-  }, [])
+  }, [onGraphMeta])
 
   useImperativeHandle(ref, () => ({ growWith }), [growWith])
 

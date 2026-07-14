@@ -169,7 +169,7 @@ export default function GraphPage() {
     panel === 'detail' && detail.state.status !== 'idle' ? (
       <DetailDrawer state={detail.state} onClose={closeDrawer} onAskAbout={handleAskAbout} />
     ) : panel === 'answer' ? (
-      <AnswerDrawer answer={ask.answer} busy={ask.busy} onClose={closeDrawer} />
+      <AnswerDrawer answer={ask.answer} busy={ask.busy} error={ask.error} onClose={closeDrawer} />
     ) : undefined
 
   return (

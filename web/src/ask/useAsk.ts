@@ -36,7 +36,10 @@ export function useAsk(
         try {
           const result = await askApi(project, query)
           setAnswer(result)
-          onExpansionRef.current(new Set(result.expansion.nodes.map((n) => n.id)))
+          // Defensive: an answer may arrive without an expansion subgraph — a
+          // missing/empty expansion must not throw the success path into catch.
+          const ids = result.expansion?.nodes?.map((n) => n.id) ?? []
+          onExpansionRef.current(ids.length ? new Set(ids) : null)
         } catch (e) {
           const message =
             e instanceof ApiError && (e.status === 413 || e.status === 429)
