@@ -24,6 +24,12 @@ type Props = {
   project: string
   filter: FilterState
   onSelectNode?: (n: GraphNode) => void
+  // Called after the graph finishes loading (with the loaded nodes) so a parent
+  // can derive e.g. the session list. Kept in a ref so its identity never
+  // re-triggers the load effect.
+  onGraphLoad?: (nodes: GraphNode[]) => void
+  // Bump to force a re-fetch of the graph (e.g. after ingesting new text).
+  reloadKey?: number | string
 }
 
 type Viewport = { x: number; y: number; scale: number }
@@ -69,9 +75,16 @@ function markerFor(rc: RelClass): string | undefined {
   return undefined
 }
 
-export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
+export default function GraphCanvas({ project, filter, onSelectNode, onGraphLoad, reloadKey }: Props) {
   const [graph, setGraph] = useState<{ nodes: GraphNode[]; links: GraphLink[] } | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  // Latest onGraphLoad without it being a load-effect dependency (a new callback
+  // identity from a parent re-render must not re-fetch the graph).
+  const onGraphLoadRef = useRef(onGraphLoad)
+  useEffect(() => {
+    onGraphLoadRef.current = onGraphLoad
+  }, [onGraphLoad])
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   // Outer stage <g> that carries the pan/zoom transform. Mutated imperatively
@@ -175,9 +188,13 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
         simRef.current = { sim: initSim(simNodes, simLinks), raf: null, drag: null }
         setGraph(g)
         ensureLoop()
+        onGraphLoadRef.current?.(g.nodes)
       })
       .catch(() => {
-        if (!cancelled) setGraph({ nodes: [], links: [] })
+        if (!cancelled) {
+          setGraph({ nodes: [], links: [] })
+          onGraphLoadRef.current?.([])
+        }
       })
 
     return () => {
@@ -186,7 +203,7 @@ export default function GraphCanvas({ project, filter, onSelectNode }: Props) {
       if (s && s.raf != null) cancelAnimationFrame(s.raf)
       simRef.current = null
     }
-  }, [project, ensureLoop])
+  }, [project, reloadKey, ensureLoop])
 
   // Place elements after any structural render (graph load, filter toggle).
   // Also re-apply the stage transform here — a structural React re-render
