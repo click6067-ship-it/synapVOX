@@ -22,6 +22,8 @@ import { buildForceData, type FNode, type FLink } from './buildForceData'
 import { loadPositions, savePositions } from './positionCache'
 import { nodeRadius, nodeCoreColor, linkColor } from './render'
 import { labelOpacity } from './lod'
+import { mergeSubgraph } from './growth'
+import { GrowthRing, type GrowthPulse } from './GrowthRing'
 
 const CANVAS_BG = '#07120F' // literal hex — canvas ctx can't read a CSS var
 const LABEL_INK = '#F4F0E7' // paper ink — readable label color on the dark canvas
@@ -89,6 +91,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const highlightLinksRef = useRef<Set<FLink>>(new Set())
   const pointerRef = useRef({ x: 0, y: 0 })
   const tooltipRef = useRef<HTMLDivElement | null>(null)
+  const pulseCounterRef = useRef(0) // monotonic id so each growth fires a fresh ring
 
   const [dims, setDims] = useState({ w: 0, h: 0 })
   const [status, setStatus] = useState<Status>('loading')
@@ -96,9 +99,58 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const [errMsg, setErrMsg] = useState('')
   const [data, setData] = useState<GraphData | null>(null)
   const [hover, setHover] = useState<FNode | null>(null) // hovered node → tooltip + tick
+  const [pulse, setPulse] = useState<GrowthPulse | null>(null) // Growth Ring fire signal
 
-  // Task 9 seam — nothing exposed yet (growWith is optional / undefined).
-  useImperativeHandle(ref, () => ({}), [])
+  // ── Task 9: incremental growth ────────────────────────────────────────────
+  // Merge a freshly-fetched session subgraph into the LIVE graph without
+  // relayout. mergeSubgraph reuses existing node OBJECTS by id, so d3-force keeps
+  // their x/y/vx/vy — existing nodes barely move; only the new nodes (seeded near
+  // their anchor) settle in. Then a calm reheat lets the local patch relax, and
+  // the Growth Ring fires on the new session node.
+  const growWith = useCallback((subgraph: GraphData) => {
+    const existing = dataRef.current
+    if (!existing) return
+    const merged = mergeSubgraph(existing, subgraph)
+    // Nothing genuinely new (e.g. a duplicate upload) → skip the pointless shake.
+    if (merged.addedNodeIds.length === 0 && merged.links.length === existing.links.length) return
+
+    const nextData: GraphData = { nodes: merged.nodes, links: merged.links }
+    dataRef.current = nextData
+    maxDegreeRef.current = nextData.nodes.reduce((m, n) => Math.max(m, n.degree), 1)
+    // New top-level object → ForceGraph2D re-binds graphData. Because the existing
+    // node OBJECTS are reused, d3 preserves their positions/velocities (no jump).
+    setData(nextData)
+
+    // Revive + calm reheat AFTER ForceGraph re-binds the new data (next frame).
+    // cooldownTicks stays 200 → the graph re-CALMS, it does not re-freeze dead.
+    // The [data] tune effect also re-applies the Obsidian forces on the fresh
+    // graph; this reheat is the explicit "settle the newcomer" nudge.
+    requestAnimationFrame(() => {
+      const fg = fgRef.current
+      if (!fg) return
+      fg.resumeAnimation()
+      fg.d3ReheatSimulation()
+    })
+
+    // Fire the ring on the new session node (fallback: anchor, then first added).
+    const sessionNew = merged.addedNodeIds
+      .map((id) => nextData.nodes.find((n) => n.id === id))
+      .find((n) => n?.type === 'session')
+    const ringNodeId = sessionNew?.id ?? merged.anchorId ?? merged.addedNodeIds[0] ?? null
+    if (ringNodeId) setPulse({ id: ++pulseCounterRef.current, nodeId: ringNodeId })
+  }, [])
+
+  useImperativeHandle(ref, () => ({ growWith }), [growWith])
+
+  // Live screen-space position of a node id — the Growth Ring reads this each
+  // frame so the ripple stays glued to the (still-settling) new session node.
+  const getScreenPos = useCallback((nodeId: string) => {
+    const fg = fgRef.current
+    const node = dataRef.current?.nodes.find((n) => n.id === nodeId)
+    if (!fg || !node || node.x == null || node.y == null) return null
+    const p = fg.graph2ScreenCoords(node.x, node.y)
+    return { x: p.x, y: p.y }
+  }, [])
 
   // ── Measure parent (ForceGraph2D needs explicit width/height) ─────────────
   useEffect(() => {
@@ -370,6 +422,19 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
           onEngineStop={handleEngineStop}
+        />
+      )}
+
+      {/* Growth Ring (Task 9): purely-visual ripple over the new session node on
+          incremental growth. pointer-events:none, never touches the sim → the
+          graph cannot move. Cleared/settled by its own onDone. */}
+      {showGraph && (
+        <GrowthRing
+          pulse={pulse}
+          width={dims.w}
+          height={dims.h}
+          getScreenPos={getScreenPos}
+          onDone={() => setPulse(null)}
         />
       )}
 
