@@ -22,6 +22,7 @@ class StubEngine:
 
     def __init__(self):
         self.ingested, self.reset_called = [], False
+        self.last_ingest_project = self.last_reset_project = None
 
     async def init(self):
         pass
@@ -33,10 +34,12 @@ class StubEngine:
         return []
 
     async def ingest(self, pid, title, text, seq=None):
+        self.last_ingest_project = pid
         self.ingested.append((title, seq))
         return {"session_key": title, "stats": {"concepts_new": 0, "relations_new": 0}, "pipeline": []}
 
     async def reset(self, pid):
+        self.last_reset_project = pid
         self.reset_called = True
 
     async def list_projects(self):
@@ -106,3 +109,17 @@ def test_graph_uses_project_param():
     with TestClient(app) as c:
         c.get("/graph?project=P-DL", headers={"X-API-Key": "demo-bio"})
     assert eng.last_project == "P-DL"
+
+
+def test_ingest_text_body_project_overrides_engine():
+    client, engine = _client(readonly=False)
+    r = client.post("/ingest-text", json={"project": "P-DL", "text": "본문"}, headers=h())
+    assert r.status_code == 200
+    assert engine.last_ingest_project == "P-DL"
+
+
+def test_invalid_project_id_returns_400():
+    client, _ = _client(readonly=False)
+    r = client.get("/graph?project=bad!id", headers=h())
+    assert r.status_code == 400
+    assert r.json()["detail"] == "invalid project id"

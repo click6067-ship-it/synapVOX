@@ -14,6 +14,8 @@ from fastapi.responses import FileResponse
 
 STATIC = Path(__file__).parent.parent / "static"
 
+_PROJECT_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
 
 def create_app(engine, corpus, key_map, cors_origins, readonly=False):
     """readonly=True 면 쓰기(ingest/reset)를 막는다 — 사전 시드된 그래프만 조회하는
@@ -34,9 +36,11 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
 
     def project_id(project: str = "P-BIO",
                     x_api_key: str | None = Header(None, alias="X-API-Key")) -> str:
+        # FastAPI dependency ⇒ 이 400은 라우트 본문의 _guard_write() 보다 먼저 실행된다 —
+        # 쓰기 엔드포인트에서도 project가 유효하지 않으면 403이 아니라 400이 먼저 뜬다.
         if not _valid_key(x_api_key):
             raise HTTPException(401, "invalid API key")
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", project):
+        if not _PROJECT_RE.fullmatch(project):
             raise HTTPException(400, "invalid project id")
         return project
 
@@ -49,7 +53,7 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False):
         raw = (raw or "").strip()
         if not raw:
             return default
-        if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", raw):
+        if not _PROJECT_RE.fullmatch(raw):
             raise HTTPException(400, "invalid project id")
         return raw
 
