@@ -495,3 +495,234 @@
   background: var(--rule);
   border-radius: var(--r-1);
 }
+
+/* ============================================================
+   AppSidebar — dashboard-first nav (Task 4). New classes only;
+   reuses .sidebar, .sidebar__brand/__wordmark/__collapse/__add,
+   .sidebar__seclabel, .sidebar__slips, .sidebar__foot above.
+   ============================================================ */
+
+/* ── Primary actions group ─────────────────────────────── */
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar--collapsed .sidebar__nav {
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.navitem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: var(--r-0);
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  transition: background var(--dur-ui) ease, border-color var(--dur-ui) ease;
+}
+.navitem:hover {
+  background: rgba(24, 23, 19, 0.05);
+}
+.navitem:focus-visible {
+  outline: 2px solid var(--rule-blue);
+  outline-offset: -2px;
+}
+.navitem.is-active {
+  border-left-color: var(--session-red);
+  background: rgba(200, 78, 58, 0.06);
+  font-weight: 600;
+}
+.navitem__ico {
+  flex: 0 0 auto;
+  width: 18px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1;
+  color: var(--sub);
+}
+.navitem.is-active .navitem__ico {
+  color: var(--session-red);
+}
+.navitem__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Collapsed → square icon buttons (icons only) */
+.sidebar--collapsed .navitem {
+  justify-content: center;
+  gap: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+}
+.sidebar--collapsed .navitem.is-active {
+  border-color: var(--session-red);
+  background: rgba(200, 78, 58, 0.06);
+}
+
+/* ── Graph scope segmented control ─────────────────────── */
+.appseg {
+  display: flex;
+  margin-top: var(--space-1);
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+  overflow: hidden;
+}
+.appseg__opt {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 4px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.2;
+  color: var(--sub);
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--rule);
+  white-space: nowrap;
+  transition: background var(--dur-ui) ease, color var(--dur-ui) ease;
+}
+.appseg__opt:last-child {
+  border-right: none;
+}
+.appseg__opt:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgba(24, 23, 19, 0.05);
+}
+.appseg__opt.is-active {
+  color: var(--paper);
+  background: var(--rule-blue); /* selection color per tokens */
+}
+.appseg__opt:disabled {
+  color: var(--rule);
+  cursor: not-allowed;
+}
+.appseg__soon {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  padding: 1px 3px;
+  color: var(--sub);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+
+/* ── Projects list ─────────────────────────────────────── */
+.appprojects {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.appproj {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 7px var(--space-2);
+  text-align: left;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--r-0);
+  transition: background var(--dur-ui) ease, border-color var(--dur-ui) ease;
+}
+.appproj:hover {
+  background: rgba(24, 23, 19, 0.045);
+}
+.appproj:focus-visible {
+  outline: 2px solid var(--rule-blue);
+  outline-offset: -2px;
+}
+.appproj.is-active {
+  border-left-color: var(--session-red);
+  background: rgba(200, 78, 58, 0.06);
+}
+.appproj__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.appproj__counts {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--sub);
+}
+/* 모든 과목 → galaxy row */
+.appproj--all {
+  border-left: none;
+  border-bottom: none;
+  margin-top: var(--space-1);
+}
+.appproj--all .appproj__name {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--sub);
+}
+.appproj--all:hover .appproj__name {
+  color: var(--ink);
+}
+
+/* Collapsed → monogram tiles */
+.sidebar--collapsed .appproj {
+  justify-content: center;
+  padding: 6px 0;
+  border-left: none;
+}
+.appproj__mono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-1);
+}
+.sidebar--collapsed .appproj.is-active .appproj__mono {
+  border-color: var(--session-red);
+  color: var(--session-red);
+}
+
+/* ── Foot (optional aggregate stat) ────────────────────── */
+.appfoot {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: var(--sub);
+}
+.appfoot__n {
+  color: var(--ink);
+  font-weight: 500;
+}
