@@ -23,12 +23,23 @@ export function nodeRadius(degree: number, type: 'session' | 'concept' | 'main')
   return base + Math.sqrt(d) * DEGREE_SCALE
 }
 
-/** Core/stroke color for a node. `main` = bright paper (the filled hub); session
- * = vermilion, concept = lime (these two are drawn HOLLOW — the color is the
- * outline). `bridge` accepted but does not change the hue. */
-export function nodeCoreColor(type: 'session' | 'concept' | 'main', _bridge: boolean): string {
-  if (type === 'main') return '#F4F0E7'
-  return type === 'concept' ? '#D8FF6A' : '#C84E3A'
+// Hierarchy tiers by color (sub-nodes drawn HOLLOW → the color is the outline):
+//   main (topic hub)       → paper ivory
+//   session (lecture)      → vermilion
+//   bridge concept (핵심)  → lime (spans ≥2 lectures — the load-bearing ideas)
+//   leaf concept (일반)    → muted teal (a single lecture's concept, recedes)
+const C_MAIN = '#F4F0E7'
+const C_SESSION = '#C84E3A'
+const C_CONCEPT_BRIDGE = '#D8FF6A'
+const C_CONCEPT_LEAF = '#4FA3A0'
+
+/** Core/stroke color for a node, by hierarchy tier. `bridge` splits concepts into
+ * the load-bearing (lime) vs leaf (teal) tiers. Size still encodes degree (see
+ * nodeRadius) — color and size together read the hierarchy. */
+export function nodeCoreColor(type: 'session' | 'concept' | 'main', bridge: boolean): string {
+  if (type === 'main') return C_MAIN
+  if (type === 'session') return C_SESSION
+  return bridge ? C_CONCEPT_BRIDGE : C_CONCEPT_LEAF
 }
 
 // rule-blue variants. Structural/cooccurrence edges use the flat base; the

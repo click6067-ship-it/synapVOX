@@ -24,10 +24,14 @@ describe('nodeRadius', () => {
   })
 })
 
-describe('nodeCoreColor', () => {
-  it('returns the exact node-core lime for concepts (regardless of bridge)', () => {
-    expect(nodeCoreColor('concept', false)).toBe('#D8FF6A')
+describe('nodeCoreColor (hierarchy tiers)', () => {
+  it('main hub → paper ivory', () => {
+    expect(nodeCoreColor('main', false)).toBe('#F4F0E7')
+  })
+
+  it('splits concepts: bridge (핵심) = lime, leaf (일반) = muted teal', () => {
     expect(nodeCoreColor('concept', true)).toBe('#D8FF6A')
+    expect(nodeCoreColor('concept', false)).toBe('#4FA3A0')
   })
 
   it('returns the exact session-red for sessions (regardless of bridge)', () => {
