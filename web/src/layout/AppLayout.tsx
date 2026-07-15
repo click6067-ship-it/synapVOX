@@ -7,12 +7,15 @@
 //   /graph?scope=project&project=P  → graph  view=graph, scope=project
 //   /graph?scope=all                → graph  view=graph, scope=all (galaxy)
 // Children receive nav callbacks via Outlet context (AppOutletContext).
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { Outlet, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { AppSidebar } from '../sidebar/AppSidebar'
 import { UploadDrawer } from '../upload/UploadDrawer'
+import { QuestionRail } from '../ask/QuestionRail'
+import { useAsk } from '../ask/useAsk'
 import { useProjects } from '../data/useProjects'
+import { projectLabel } from '../graph/projectMeta'
 import './applayout.css'
 
 export type AppOutletContext = {
@@ -21,9 +24,12 @@ export type AppOutletContext = {
   onAddLecture(): void
   onOpenGraph(scope: 'project' | 'all', project?: string): void
   onSelectProject(project: string): void
-  // Bumped when the sidebar's 질문하기 is pressed on a focused dashboard, so the
-  // Question Dock can imperatively focus itself. 0 = never requested.
-  focusQuestionNonce: number
+  // Focus the far-right 질문하기 rail (from the dashboard's 질문하기 button).
+  onFocusQuestion(): void
+  // Ask a concept in the right rail (a detail drawer's "이 개념 질문").
+  onAskConcept(label: string): void
+  // RAG evidence node ids from the last answer → GraphModePage highlights them.
+  askExpansion: Set<string> | null
 }
 
 export default function AppLayout(): JSX.Element {
@@ -60,6 +66,30 @@ export default function AppLayout(): JSX.Element {
     return single ? [single] : []
   }, [view, params, projects])
 
+  // ── Right-rail Q&A (shared) ────────────────────────────────────────────────
+  // The 질문하기 rail asks the active project (or, in a multi-project graph, the
+  // first shown). AppLayout owns the RAG state so the same ask ALSO drives the
+  // graph highlight (askExpansion → GraphModePage via Outlet context).
+  const [askExpansion, setAskExpansion] = useState<Set<string> | null>(null)
+  const askProject = activeProject ?? graphProjects[0] ?? ''
+  const ask = useAsk(askProject, setAskExpansion)
+  // Switching projects clears the previous answer + graph highlight. Guarded on
+  // the ACTUAL project change (via ref) so a mere re-render can never wipe a live
+  // answer, independent of useAsk's clear identity.
+  const askClearRef = useRef(ask.clear)
+  askClearRef.current = ask.clear
+  const prevAskProjectRef = useRef(askProject)
+  useEffect(() => {
+    if (prevAskProjectRef.current !== askProject) {
+      prevAskProjectRef.current = askProject
+      askClearRef.current()
+    }
+  }, [askProject])
+  // Multi-project graph asks only the first shown project (backend /ask is per
+  // group_id) — disclose that in the rail rather than silently scoping.
+  const askNote =
+    graphProjects.length > 1 ? `여러 과목을 함께 보는 중 — 질문은 ${projectLabel(askProject)} 기준이에요.` : undefined
+
   // ── Navigation handlers ────────────────────────────────────────────────────
   const openGraph = useCallback(
     (s: 'project' | 'all', project?: string) => {
@@ -93,19 +123,38 @@ export default function AppLayout(): JSX.Element {
     setUpload({ open: true, mode: activeProject ? 'add' : 'new' })
   }, [activeProject])
 
-  // 질문하기: route to a project's dashboard (structured Q&A lives there), then
-  // nudge its Question Dock to focus. No project yet → guide them to add one.
+  // 질문하기: focus the far-right rail's input. If a subject is active, bump the
+  // nonce now. If not, navigate to the first project first and defer the focus
+  // bump until that project is active (else the rail input isn't mounted yet).
+  const pendingFocusRef = useRef(false)
   const focusQuestion = useCallback(() => {
-    const target = activeProject ?? projects[0]?.project ?? null
-    if (!target) {
-      setUpload({ open: true, mode: 'new' })
+    if (askProject) {
+      setFocusQuestionNonce((n) => n + 1)
       return
     }
-    if (location.pathname !== `/p/${encodeURIComponent(target)}`) {
-      navigate(`/p/${encodeURIComponent(target)}`)
+    if (projects[0]) {
+      pendingFocusRef.current = true
+      navigate(`/p/${encodeURIComponent(projects[0].project)}`)
+    } else {
+      setUpload({ open: true, mode: 'new' })
     }
-    setFocusQuestionNonce((n) => n + 1)
-  }, [activeProject, projects, location.pathname, navigate])
+  }, [askProject, projects, navigate])
+  useEffect(() => {
+    if (askProject && pendingFocusRef.current) {
+      pendingFocusRef.current = false
+      setFocusQuestionNonce((n) => n + 1)
+    }
+  }, [askProject])
+
+  // "이 개념 질문" from a detail drawer → ask it in the right rail + focus it.
+  const askAsk = ask.ask
+  const askConcept = useCallback(
+    (label: string) => {
+      askAsk(`"${label}"이 무엇인지 이 강의들을 근거로 설명해줘`)
+      setFocusQuestionNonce((n) => n + 1)
+    },
+    [askAsk],
+  )
 
   // Upload succeeded → refresh the project list and land on the new lecture's
   // focused dashboard (dashboard-first: you see the new outline, not the graph).
@@ -122,9 +171,11 @@ export default function AppLayout(): JSX.Element {
       onAddLecture: openUpload,
       onOpenGraph: openGraph,
       onSelectProject: selectProject,
-      focusQuestionNonce,
+      onFocusQuestion: focusQuestion,
+      onAskConcept: askConcept,
+      askExpansion,
     }),
-    [openUpload, openGraph, selectProject, focusQuestionNonce],
+    [openUpload, openGraph, selectProject, focusQuestion, askConcept, askExpansion],
   )
 
   return (
@@ -150,6 +201,19 @@ export default function AppLayout(): JSX.Element {
       <main className="applayout__main">
         <Outlet context={outletContext} />
       </main>
+
+      <div className="applayout__qrail">
+        <QuestionRail
+          project={askProject}
+          answer={ask.answer}
+          busy={ask.busy}
+          error={ask.error}
+          onAsk={ask.ask}
+          onClear={ask.clear}
+          focusNonce={focusQuestionNonce}
+          note={askNote}
+        />
+      </div>
 
       <UploadDrawer
         project={activeProject ?? ''}

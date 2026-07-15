@@ -30,6 +30,7 @@ _PROJECT_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 # 쓰기 남용 상한 — 클라이언트에 shipped된 공개 데모 키로도 비용/저장이 무한정
 # 늘지 않게 한다(leaked-key billing-DoS 방어). readonly=False(홈 생성 허용) 배포에서만 의미.
 _MAX_TEXT_CHARS = 50_000  # 한 번에 넣는 본문 상한(긴 단일 강의도 충분히 커버)
+_MAX_PROJECT_NAME = 80  # 프로젝트 표시 이름 길이 상한(사람이 읽는 이름)
 _MAX_SESSIONS_PER_PROJECT = 40  # 프로젝트당 세션 수 상한
 _MAX_PROJECTS = 60  # 새 그룹 무한 생성 방어(신규 프로젝트 최초 ingest에서만 검사)
 # per-IP 쓰기 속도 제한 — 총량 캡(위)이 '얼마나 많이'를 막는다면 이건 '얼마나 빨리'를 막는다.
@@ -174,6 +175,9 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
         if len(text) > _MAX_TEXT_CHARS:
             raise HTTPException(413, f"텍스트가 너무 깁니다 (최대 {_MAX_TEXT_CHARS:,}자). 나눠서 넣어 주세요.")
         title = (body.get("title") or "").strip() or "붙여넣은 강의"
+        # 사람이 읽는 프로젝트 표시 이름(예: "최적화개론"). group_id는 ASCII 슬러그라도
+        # 이름은 서버에 저장돼 모든 기기·팀원에게 한글로 보인다. 상한은 group_id와 동일.
+        name = (body.get("name") or "").strip()[:_MAX_PROJECT_NAME] or None
         n = len(await engine.sessions_in(project))
         if n >= _MAX_SESSIONS_PER_PROJECT:
             raise HTTPException(429, f"이 프로젝트의 세션 한도({_MAX_SESSIONS_PER_PROJECT})에 도달했습니다.")
@@ -183,7 +187,19 @@ def create_app(engine, corpus, key_map, cors_origins, readonly=False, allow_rese
             # 단일 인스턴스 데모에서는 best-effort로 충분하다(원자화는 DB constraint 필요 → 과대).
             if len(await engine.list_projects()) >= _MAX_PROJECTS:
                 raise HTTPException(429, f"프로젝트 한도({_MAX_PROJECTS})에 도달했습니다.")
-        return await engine.ingest(project, title, text, seq=n + 1)
+        return await engine.ingest(project, title, text, seq=n + 1, name=name)
+
+    @app.post("/project-name")
+    async def project_name(body: dict, request: Request, pid: str = Depends(project_id)):
+        # 프로젝트 표시 이름 설정/변경(기존 슬러그 프로젝트를 한글 이름으로 고치는 용도 포함).
+        _guard_write()
+        _rate_limit(request, "write", _RATE_MAX_WRITES)
+        project = _resolve_project(body.get("project"), pid)
+        name = (body.get("name") or "").strip()[:_MAX_PROJECT_NAME]
+        if not name:
+            raise HTTPException(400, "name이 비어 있습니다")
+        await engine.set_project_name(project, name)
+        return {"ok": True, "project": project, "name": name}
 
     @app.post("/reset")
     async def reset(body: dict | None = None, pid: str = Depends(project_id)):

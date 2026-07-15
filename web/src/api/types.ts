@@ -1,6 +1,8 @@
 // 백엔드(/graph, /projects) 응답 형식 — gsvx/engine.py graph()/list_projects() 그대로 매핑.
 
-export type Project = { project: string; sessions: number; concepts: number }
+// `name` = server-stored human display name (e.g. "최적화개론") for a project whose
+// group_id is an ASCII slug; absent for the seeded demo projects (labeled locally).
+export type Project = { project: string; sessions: number; concepts: number; name?: string | null }
 
 export type RawNode = {
   id: string

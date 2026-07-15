@@ -1,0 +1,115 @@
+/* QuestionRail — far-right paper sidebar for 질문하기. Mirrors the left spine:
+   paper ground, ink text, hairline separators. Header + input + answer body. */
+.qrail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.qrail__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--rule);
+}
+.qrail__title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.qrail__scope {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.qrail__form {
+  flex: 0 0 auto;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+.qrail__input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  border-radius: var(--r-1);
+  outline: none;
+}
+.qrail__input::placeholder {
+  color: var(--sub);
+}
+.qrail__input:focus {
+  border-color: var(--rule-blue);
+}
+.qrail__send {
+  flex: 0 0 auto;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  color: var(--paper);
+  background: var(--ink);
+  border: var(--bind);
+  border-radius: var(--r-0);
+  transition: background var(--dur-ui) ease, border-color var(--dur-ui) ease;
+}
+.qrail__send:hover:not(:disabled) {
+  background: var(--rule-blue);
+  border-color: var(--rule-blue);
+}
+.qrail__send:disabled {
+  color: var(--sub);
+  background: transparent;
+  border-color: var(--rule);
+  cursor: not-allowed;
+}
+
+.qrail__note {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-3);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--rule-blue);
+}
+
+.qrail__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--rule);
+}
+/* AnswerDrawer fills the body and scrolls internally. */
+.qrail__body .answer-drawer {
+  flex: 1;
+  min-height: 0;
+}
+
+.qrail__hint,
+.qrail__empty {
+  margin: 0;
+  padding: var(--space-4);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sub);
+}
+.qrail__empty {
+  border-top: 1px solid var(--rule);
+}

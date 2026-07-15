@@ -71,7 +71,13 @@ class GraphitiEngine:
             return [r.data() async for r in res]
 
     # ── 수집 ────────────────────────────────────────────
-    async def ingest(self, project: str, title: str, text: str, seq: int | None = None) -> dict:
+    async def ingest(self, project: str, title: str, text: str, seq: int | None = None,
+                     name: str | None = None) -> dict:
+        # 사람이 읽는 프로젝트 표시 이름(예: "최적화개론") — group_id는 ASCII만 허용하므로
+        # 슬러그가 되지만, 이름은 SvxProject 노드에 별도로 저장해 /projects가 돌려준다.
+        # 모든 기기·팀원이 한글 이름을 보게 하려는 목적(브라우저 로컬 저장이 아님).
+        if name and name.strip():
+            await self.set_project_name(project, name.strip())
         ref = BASE_DATE + timedelta(days=seq or 0)
         r = await self.g.add_episode(
             name=title, episode_body=text, source=EpisodeType.text,
@@ -213,7 +219,12 @@ class GraphitiEngine:
         return {"query": q, "answer": answer, "hits": hits, "expansion": {"nodes": exp_nodes, "edges": exp_edges}}
 
     async def reset(self, project):
+        # SvxProject(표시 이름) 노드도 group_id로 걸리므로 함께 삭제 — 이름도 정리됨.
         await self._read("MATCH (n {group_id:$g}) DETACH DELETE n", g=project)
+
+    async def set_project_name(self, project, name):
+        """group_id → 사람이 읽는 표시 이름을 저장(생성/변경). /projects가 이 이름을 돌려준다."""
+        await self._read("MERGE (p:SvxProject {group_id:$g}) SET p.name=$name", g=project, name=name)
 
     async def sessions_in(self, project):
         return await self._read("MATCH (e:Episodic {group_id:$g}) RETURN e.name AS name", g=project)
@@ -221,11 +232,12 @@ class GraphitiEngine:
     async def list_projects(self):
         rows = await self._read(
             "MATCH (e:Episodic) WITH e.group_id AS project, count(e) AS sessions "
-            "RETURN project, sessions ORDER BY project")
+            "OPTIONAL MATCH (p:SvxProject {group_id: project}) "
+            "RETURN project, sessions, p.name AS name ORDER BY project")
         out = []
         for r in rows:
             c = await self._read(
                 "MATCH (n:Entity {group_id:$g}) RETURN count(n) AS c", g=r["project"])
             out.append({"project": r["project"], "sessions": r["sessions"],
-                        "concepts": (c[0]["c"] if c else 0)})
+                        "concepts": (c[0]["c"] if c else 0), "name": r.get("name")})
         return out

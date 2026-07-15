@@ -18,7 +18,8 @@ function DashboardRoute() {
       onAddLecture={ctx.onAddLecture}
       onOpenGraph={ctx.onOpenGraph}
       onSelectProject={ctx.onSelectProject}
-      focusQuestionNonce={ctx.focusQuestionNonce}
+      onFocusQuestion={ctx.onFocusQuestion}
+      onAskConcept={ctx.onAskConcept}
     />
   )
 }

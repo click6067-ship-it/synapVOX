@@ -19,7 +19,15 @@ export function useAsk(
   const onExpansionRef = useRef(onExpansion)
   onExpansionRef.current = onExpansion
 
+  // Request generation: bumped on every ask AND on clear(). A resolving request
+  // whose gen no longer matches has been superseded (project switched, cleared,
+  // or re-asked) — it must NOT write its answer/expansion into the shared state.
+  // This hook now persists across project switches (AppLayout's right rail), so
+  // an in-flight P1 answer could otherwise land under P2.
+  const genRef = useRef(0)
+
   const clear = useCallback(() => {
+    genRef.current += 1 // invalidate any in-flight request
     setAnswer(null)
     setError(null)
     setBusy(false)
@@ -32,15 +40,18 @@ export function useAsk(
       if (!query || busy) return
       setBusy(true)
       setError(null)
+      const gen = (genRef.current += 1)
       void (async () => {
         try {
           const result = await askApi(project, query)
+          if (gen !== genRef.current) return // superseded → drop
           setAnswer(result)
           // Defensive: an answer may arrive without an expansion subgraph — a
           // missing/empty expansion must not throw the success path into catch.
           const ids = result.expansion?.nodes?.map((n) => n.id) ?? []
           onExpansionRef.current(ids.length ? new Set(ids) : null)
         } catch (e) {
+          if (gen !== genRef.current) return // superseded → drop
           const message =
             e instanceof ApiError && (e.status === 413 || e.status === 429)
               ? e.message
@@ -49,7 +60,7 @@ export function useAsk(
           setAnswer(null)
           onExpansionRef.current(null)
         } finally {
-          setBusy(false)
+          if (gen === genRef.current) setBusy(false)
         }
       })()
     },

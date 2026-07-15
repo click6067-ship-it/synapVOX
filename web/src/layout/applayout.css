@@ -29,7 +29,23 @@
   overflow: hidden;
 }
 
-/* Mobile: stack the rail on top as a short scrollable strip. (Collapse still
+/* Far-right 질문하기 rail — the paper spine's mirror. */
+.applayout__qrail {
+  flex: 0 0 360px;
+  height: 100%;
+  border-left: var(--bind);
+  overflow: hidden;
+}
+
+/* Below 1100px the right rail would crowd the content — hide it. (질문하기 is a
+   desktop sidebar; a compact overlay for narrow screens is a later polish item.) */
+@media (max-width: 1100px) {
+  .applayout__qrail {
+    display: none;
+  }
+}
+
+/* Mobile: stack the left rail on top as a short scrollable strip. (Collapse still
    works; the off-canvas overlay is a later polish item.) */
 @media (max-width: 720px) {
   .applayout {
