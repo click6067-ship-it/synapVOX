@@ -1,0 +1,47 @@
+/* AppLayout — persistent left rail + routed main area. The rail is the paper
+   "spine"; the main area is filled by the routed page (Dashboard = paper/scroll,
+   GraphModePage = dark canvas). Full viewport, no page scroll. */
+.applayout {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.applayout__rail {
+  flex: 0 0 280px;
+  height: 100%;
+  border-right: var(--bind);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.applayout--collapsed .applayout__rail {
+  flex-basis: 64px;
+}
+
+.applayout__main {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Mobile: stack the rail on top as a short scrollable strip. (Collapse still
+   works; the off-canvas overlay is a later polish item.) */
+@media (max-width: 720px) {
+  .applayout {
+    flex-direction: column;
+  }
+  .applayout__rail {
+    flex: 0 0 auto;
+    max-height: 42vh;
+    border-right: none;
+    border-bottom: var(--bind);
+  }
+  .applayout__main {
+    flex: 1 1 auto;
+  }
+}
