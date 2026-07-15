@@ -58,7 +58,7 @@ type FGRef = ForceGraphMethods<NodeObject<FNode>, LinkObject<FNode, FLink>>
 
 // Friendly display names for the project hubs. A project's group_id is a slug;
 // map the known demo projects to their topic name (fallback = the id itself).
-const PROJECT_LABELS: Record<string, string> = { 'P-BIO': '딥러닝', 'P-LIFE': '생명과학' }
+const PROJECT_LABELS: Record<string, string> = { 'P-BIO': '딥러닝', 'P-LIFE': '생명과학', 'P-ML': '머신러닝' }
 export function projectLabel(project: string): string {
   return PROJECT_LABELS[project] ?? project
 }
