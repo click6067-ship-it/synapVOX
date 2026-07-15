@@ -75,10 +75,20 @@ export async function ingestText(
   title: string,
   text: string,
   signal?: AbortSignal,
+  name?: string,
 ): Promise<unknown> {
   // `signal` lets the upload modal's 취소 abort the in-flight request. (The server
   // may still finish the ingest — cancel means "stop waiting," not "undo.")
-  return jsonOrThrow(await req('/ingest-text', { body: JSON.stringify({ project, title, text }), signal }, 'POST'))
+  // `name` = human display name for a NEW project (stored server-side so every
+  // device/teammate sees the Korean name instead of the ASCII group_id slug).
+  const payload: Record<string, unknown> = { project, title, text }
+  if (name && name.trim()) payload.name = name.trim()
+  return jsonOrThrow(await req('/ingest-text', { body: JSON.stringify(payload), signal }, 'POST'))
+}
+
+/** Set/rename a project's human display name (fixes an existing slug project). */
+export async function setProjectName(project: string, name: string): Promise<void> {
+  await jsonOrThrow(await req('/project-name', { body: JSON.stringify({ project, name }) }, 'POST'))
 }
 
 // ── 상세 조회 (concept/session) ─────────────────────────────

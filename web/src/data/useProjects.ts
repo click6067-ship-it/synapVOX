@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { listProjects } from '../api/client'
 import type { Project } from '../api/types'
+import { rememberProjectNames } from '../graph/projectMeta'
 
 export function useProjects(): {
   projects: Project[]
@@ -22,7 +23,9 @@ export function useProjects(): {
     listProjects()
       .then((p) => {
         if (cancelled) return
-        setProjects(Array.isArray(p) ? p : [])
+        const list = Array.isArray(p) ? p : []
+        rememberProjectNames(list) // so projectLabel(id) resolves names app-wide
+        setProjects(list)
         setLoading(false)
       })
       .catch(() => {

@@ -1,27 +1,26 @@
-// GraphModePage — the force graph as a *mode* (not the whole app). Reached from
-// the sidebar's 그래프 시각화 button; the persistent AppSidebar + global upload
-// live in AppLayout, so this page is just the canvas + its overlays + a right
-// drawer. Scope comes from the URL:
+// GraphModePage — the force graph as a *mode* (not the whole app). The persistent
+// left AppSidebar, global upload, and the far-right 질문하기 rail all live in
+// AppLayout; this page is just the canvas + a right detail drawer. Scope from URL:
 //   /graph?scope=project&project=P-BIO → one project's graph
 //   /graph?scope=all                   → the galaxy (every project as a far-apart
 //                                        hub cluster via GraphView's mainRepel)
-// Reuses the existing GraphView (elastic physics · hierarchy colors · galaxy),
-// useAsk (RAG → 근거 하이라이트), useDetail (concept/session inspector).
-import { useCallback, useMemo, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import GraphView, { type GraphViewHandle } from '../graph/GraphView'
+//   /graph?projects=A,B                → those together (교차연결 bridges)
+// Asking happens in the right rail; its RAG evidence (askExpansion, via Outlet
+// context) highlights this graph — "질문하면 그래프가 근거로 반응".
+import { useCallback, useMemo, useState } from 'react'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
+import GraphView from '../graph/GraphView'
 import type { FNode } from '../graph/buildForceData'
 import { useProjects } from '../data/useProjects'
-import { AskBar } from '../ask/AskBar'
-import { AnswerDrawer } from '../ask/AnswerDrawer'
-import { useAsk } from '../ask/useAsk'
 import { DetailDrawer } from '../detail/DetailDrawer'
 import { useDetail } from '../detail/useDetail'
+import type { AppOutletContext } from '../layout/AppLayout'
 import './graphmode.css'
 
 export default function GraphModePage() {
   const [params] = useSearchParams()
   const { projects } = useProjects()
+  const { askExpansion, onAskConcept } = useOutletContext<AppOutletContext>()
 
   const scope: 'project' | 'all' = params.get('scope') === 'all' ? 'all' : 'project'
   const projectParam = params.get('project') ?? ''
@@ -43,12 +42,8 @@ export default function GraphModePage() {
   const multi = showProjects.length > 1
 
   const [meta, setMeta] = useState({ nodes: 0, edges: 0, settled: false, cross: 0 })
-  const [panel, setPanel] = useState<'detail' | 'answer' | null>(null)
-  const [askExpansion, setAskExpansion] = useState<Set<string> | null>(null)
-
-  const graphRef = useRef<GraphViewHandle>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
   const detail = useDetail(project)
-  const ask = useAsk(project, setAskExpansion)
 
   const handleGraphMeta = useCallback(
     (m: { nodes: number; edges: number; settled: boolean; cross?: number }) =>
@@ -59,39 +54,17 @@ export default function GraphModePage() {
   const handleSelectNode = useCallback(
     (n: FNode) => {
       detail.open(n)
-      setPanel('detail')
+      setDetailOpen(true)
     },
     [detail],
   )
-  const handleAsk = useCallback(
-    (q: string) => {
-      ask.ask(q)
-      setPanel('answer')
-    },
-    [ask],
-  )
-  const handleAskAbout = useCallback(
-    (label: string) => {
-      ask.ask(`"${label}"이 무엇인지 이 강의들을 근거로 설명해줘`)
-      setPanel('answer')
-    },
-    [ask],
-  )
-  const closeDrawer = useCallback(() => {
-    setPanel(null)
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false)
     detail.close()
-    ask.clear()
-  }, [detail, ask])
+  }, [detail])
 
   // Every project after the first renders as its own far-apart hub cluster.
   const alsoShow = useMemo(() => showProjects.slice(1), [showProjects])
-
-  const drawer =
-    panel === 'detail' && detail.state.status !== 'idle' ? (
-      <DetailDrawer state={detail.state} onClose={closeDrawer} onAskAbout={handleAskAbout} />
-    ) : panel === 'answer' ? (
-      <AnswerDrawer answer={ask.answer} busy={ask.busy} error={ask.error} onClose={closeDrawer} />
-    ) : null
 
   return (
     <div className="graphmode">
@@ -99,7 +72,6 @@ export default function GraphModePage() {
         {project ? (
           <>
             <GraphView
-              ref={graphRef}
               project={project}
               alsoShow={alsoShow}
               onGraphMeta={handleGraphMeta}
@@ -111,13 +83,23 @@ export default function GraphModePage() {
               {meta.nodes} concepts · {meta.edges} edges
               {meta.cross ? ` · 교차연결 ${meta.cross}` : ''} · {meta.settled ? 'settled' : 'settling…'}
             </div>
-            <AskBar onSubmit={handleAsk} busy={ask.busy} />
           </>
         ) : (
           <div className="canvas-empty">그래프를 불러오는 중…</div>
         )}
       </div>
-      {drawer ? <aside className="graphmode__drawer">{drawer}</aside> : null}
+      {detailOpen && detail.state.status !== 'idle' ? (
+        <aside className="graphmode__drawer">
+          <DetailDrawer
+            state={detail.state}
+            onClose={closeDetail}
+            onAskAbout={(label) => {
+              closeDetail()
+              onAskConcept(label)
+            }}
+          />
+        </aside>
+      ) : null}
     </div>
   )
 }

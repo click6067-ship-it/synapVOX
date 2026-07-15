@@ -81,8 +81,9 @@ export function UploadDrawer(props: {
     e.preventDefault()
     if (!canSubmit) return
     // 'new' mode: derive a fresh, backend-safe group_id from the name and ingest
-    // there. 'add' mode: no target → the hook uses the current project.
-    submit(title.trim(), text, isNew ? slugify(name.trim()) : undefined)
+    // there, passing the human name so the server stores it (shown to everyone
+    // instead of the slug). 'add' mode: no target/name → uses the current project.
+    submit(title.trim(), text, isNew ? slugify(name.trim()) : undefined, isNew ? name.trim() : undefined)
   }
 
   // Done → "새 세션 보기": clear the form, reset the machine, hand off to close.

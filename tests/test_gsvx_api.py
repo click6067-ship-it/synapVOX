@@ -24,9 +24,11 @@ class StubEngine:
         self.ingested, self.reset_called = [], False
         self.last_ingest_project = self.last_reset_project = None
         self.last_project = self.last_ask = self.last_search = None
+        self.last_ingest_name = None
+        self.named = {}  # group_id → display name (set_project_name)
         # Configurable so cap tests can simulate a full project / many projects.
         self.sessions_count = 0
-        self._projects = [{"project": "P-BIO", "sessions": 2, "concepts": 5}]
+        self._projects = [{"project": "P-BIO", "sessions": 2, "concepts": 5, "name": None}]
 
     async def init(self):
         pass
@@ -37,10 +39,14 @@ class StubEngine:
     async def sessions_in(self, pid):
         return [{"name": f"s{i}"} for i in range(self.sessions_count)]
 
-    async def ingest(self, pid, title, text, seq=None):
+    async def ingest(self, pid, title, text, seq=None, name=None):
         self.last_ingest_project = pid
+        self.last_ingest_name = name
         self.ingested.append((title, seq))
         return {"session_key": title, "stats": {"concepts_new": 0, "relations_new": 0}, "pipeline": []}
+
+    async def set_project_name(self, pid, name):
+        self.named[pid] = name
 
     async def reset(self, pid):
         self.last_reset_project = pid
@@ -176,6 +182,48 @@ def test_ingest_text_within_caps_succeeds():
     r = client.post("/ingest-text", json={"text": "짧은 본문"}, headers=h())
     assert r.status_code == 200
     assert engine.ingested == [("붙여넣은 강의", 4)]  # seq = n+1
+
+
+def test_ingest_text_passes_display_name():
+    # 한글 표시 이름을 body.name으로 넘기면 엔진 ingest에 그대로 전달된다.
+    client, engine = _client(readonly=False)
+    r = client.post("/ingest-text", json={"project": "graph-xyz", "text": "본문", "name": "최적화개론"}, headers=h())
+    assert r.status_code == 200
+    assert engine.last_ingest_name == "최적화개론"
+
+
+def test_ingest_text_no_name_passes_none():
+    client, engine = _client(readonly=False)
+    client.post("/ingest-text", json={"text": "본문"}, headers=h())
+    assert engine.last_ingest_name is None
+
+
+def test_project_name_sets_display_name():
+    client, engine = _client(readonly=False)
+    r = client.post("/project-name", json={"project": "graph-xyz", "name": "고급신경망"}, headers=h())
+    assert r.status_code == 200
+    assert r.json() == {"ok": True, "project": "graph-xyz", "name": "고급신경망"}
+    assert engine.named["graph-xyz"] == "고급신경망"
+
+
+def test_project_name_requires_name():
+    client, _ = _client(readonly=False)
+    r = client.post("/project-name", json={"project": "graph-xyz", "name": "  "}, headers=h())
+    assert r.status_code == 400
+
+
+def test_project_name_blocked_in_readonly():
+    client, engine = _client(readonly=True)
+    r = client.post("/project-name", json={"project": "graph-xyz", "name": "x"}, headers=h())
+    assert r.status_code == 403
+    assert engine.named == {}
+
+
+def test_projects_endpoint_includes_name():
+    client, engine = _client(readonly=False)
+    engine._projects = [{"project": "graph-xyz", "sessions": 1, "concepts": 9, "name": "최적화개론"}]
+    r = client.get("/projects", headers=h())
+    assert r.json()["projects"][0]["name"] == "최적화개론"
 
 
 def test_write_rate_limit_per_ip():

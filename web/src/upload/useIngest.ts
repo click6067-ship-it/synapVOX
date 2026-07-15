@@ -23,7 +23,8 @@ export type UseIngest = {
   error: string | null
   // `target` overrides the destination project (used by "new project" mode to
   // ingest into a fresh slug); when omitted the lecture lands in `project`.
-  submit: (title: string, text: string, target?: string) => void
+  // `name` = human display name for a new project (stored server-side).
+  submit: (title: string, text: string, target?: string, name?: string) => void
   reset: () => void
   // Abort the in-flight ingest (취소 button) and return to idle. The server may
   // still finish server-side; this only stops the client from waiting/navigating.
@@ -87,7 +88,7 @@ export function useIngest(project: string, onIngested: (project: string, title: 
   const cancel = reset
 
   const submit = useCallback(
-    (title: string, text: string, target?: string) => {
+    (title: string, text: string, target?: string, name?: string) => {
       // Ignore re-submits while a request is in flight.
       if (busyRef.current) return
       busyRef.current = true
@@ -117,7 +118,7 @@ export function useIngest(project: string, onIngested: (project: string, title: 
         // or fire onIngested/navigate for the wrong lecture.
         const isCurrent = () => aliveRef.current && abortRef.current === ac
         try {
-          await ingestText(dest, title, text, ac.signal)
+          await ingestText(dest, title, text, ac.signal, name)
           if (!isCurrent()) return
           clearTimers()
           setStage('growing')
