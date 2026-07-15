@@ -7,7 +7,7 @@
 //   --session-red #C84E3A (session core, vermilion)
 //   --rule-blue  #2F6F86  (links / focus / selection)
 
-import type { RelClass } from './mapGraph'
+import type { FRelClass } from './buildForceData'
 
 const CONCEPT_BASE = 4
 const SESSION_BASE = 5 // sessions read slightly heavier than concepts
@@ -49,10 +49,15 @@ export function nodeCoreColor(type: 'session' | 'concept' | 'main', bridge: bool
 const RULE_BLUE = '#2F6F86'
 const RULE_BLUE_STRONG = '#4E90A8'
 const MENTIONS_DIM = 'rgba(47, 111, 134, 0.38)'
+// Cross-project "shared concept" bridge — brighter rule-blue so it reads across
+// the gap between two topic clusters (drawn dashed in GraphView).
+const CROSS_BLUE = '#5FB6D4'
 
 /** Link stroke color by relation class. */
-export function linkColor(relClass: RelClass): string {
+export function linkColor(relClass: FRelClass): string {
   switch (relClass) {
+    case 'cross':
+      return CROSS_BLUE
     case 'mentions':
       return MENTIONS_DIM
     case 'next':

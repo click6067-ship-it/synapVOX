@@ -5,6 +5,7 @@
 //   Projects: projectLabel + 세션 N·개념 M (mono), + 모든 과목 → galaxy
 // Purely prop-driven (data down, callbacks up). AppLayout wires nav/data.
 // Collapse toggles the rail width via `collapsed` + onToggleCollapse (280↔64, icons only).
+import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import type { Project } from '../api/types'
 import { projectLabel } from '../graph/projectMeta'
@@ -21,7 +22,9 @@ export function AppSidebar(props: {
   onOpenUpload(): void
   onFocusQuestion(): void
   onOpenGraph(scope: 'project' | 'all'): void
+  onOpenGraphProjects(ids: string[]): void
   onSelectProject(p: string): void
+  graphProjects?: string[] // projects the graph currently shows → seeds the checkboxes
 }): JSX.Element {
   const {
     projects,
@@ -34,14 +37,39 @@ export function AppSidebar(props: {
     onOpenUpload,
     onFocusQuestion,
     onOpenGraph,
+    onOpenGraphProjects,
     onSelectProject,
+    graphProjects,
   } = props
 
   const dashboardActive = view === 'dashboard'
   const graphActive = view === 'graph'
-  // The bare "그래프 시각화" button opens the current project's graph when one is
-  // focused, otherwise the whole-archive galaxy — spec §5.
+
+  // Checkbox selection for "함께 보기" (교차연결). Seeded from whatever the graph is
+  // currently showing so a deep link / active galaxy reflects in the checkboxes.
+  const graphKey = (graphProjects ?? []).join(',')
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(graphProjects ?? []))
+  useEffect(() => {
+    if (view === 'graph') setSelected(new Set(graphProjects ?? []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, graphKey])
+  const toggleSelected = (p: string) =>
+    setSelected((s) => {
+      const next = new Set(s)
+      if (next.has(p)) next.delete(p)
+      else next.add(p)
+      return next
+    })
+  // Preserve sidebar order (딥러닝·생명과학·머신러닝) in the emitted list.
+  const selectedOrdered = projects.map((p) => p.project).filter((p) => selected.has(p))
+
+  // The "그래프 시각화" button: checked subjects → visualize those together;
+  // else the current project's graph (or the galaxy when none is focused).
   const graphDefaultScope: 'project' | 'all' = activeProject ? 'project' : 'all'
+  const openGraphFromSelection = () => {
+    if (selectedOrdered.length >= 1) onOpenGraphProjects(selectedOrdered)
+    else onOpenGraph(graphDefaultScope)
+  }
 
   const totals = projects.reduce(
     (acc, p) => ({ sessions: acc.sessions + p.sessions, concepts: acc.concepts + p.concepts }),
@@ -117,47 +145,44 @@ export function AppSidebar(props: {
         <button
           type="button"
           className={`navitem${graphActive ? ' is-active' : ''}`}
-          onClick={() => onOpenGraph(graphDefaultScope)}
+          onClick={openGraphFromSelection}
           aria-current={graphActive ? 'page' : undefined}
-          title="그래프 시각화"
+          title={
+            selectedOrdered.length > 1
+              ? `선택한 ${selectedOrdered.length}과목 함께 보기 (교차연결)`
+              : '그래프 시각화'
+          }
         >
           <span className="navitem__ico" aria-hidden="true">
             ◈
           </span>
-          {!collapsed && <span className="navitem__label">그래프 시각화</span>}
+          {!collapsed && (
+            <span className="navitem__label">
+              그래프 시각화
+              {selectedOrdered.length > 0 && (
+                <span className="navitem__badge">{selectedOrdered.length}</span>
+              )}
+            </span>
+          )}
         </button>
 
-        {/* Graph scope — only while the graph mode is active, and only expanded */}
+        {/* Scope shortcuts — only while the graph mode is active, and only expanded */}
         {graphActive && !collapsed && (
           <div className="appseg" role="group" aria-label="그래프 범위">
             <button
               type="button"
-              className={`appseg__opt${scope === 'project' ? ' is-active' : ''}`}
+              className={`appseg__opt${(graphProjects?.length ?? 0) <= 1 && scope !== 'all' ? ' is-active' : ''}`}
               onClick={() => onOpenGraph('project')}
               disabled={!activeProject}
-              aria-pressed={scope === 'project'}
             >
-              현재 프로젝트
+              현재 과목
             </button>
             <button
               type="button"
               className={`appseg__opt${scope === 'all' ? ' is-active' : ''}`}
               onClick={() => onOpenGraph('all')}
-              aria-pressed={scope === 'all'}
             >
               전체
-            </button>
-            <button
-              type="button"
-              className={`appseg__opt${scope === 'cross' ? ' is-active' : ''}`}
-              disabled
-              title="교차연결은 곧 (P1)"
-              aria-pressed={scope === 'cross'}
-            >
-              교차연결
-              <span className="appseg__soon" aria-hidden="true">
-                곧
-              </span>
             </button>
           </div>
         )}
@@ -170,14 +195,30 @@ export function AppSidebar(props: {
           <span className="sidebar__seccount">{projects.length}</span>
         </div>
       )}
+      {!collapsed && projects.length > 1 && (
+        <p className="appprojects__hint">
+          체크해서 <strong>그래프 시각화</strong>로 함께 보기
+        </p>
+      )}
 
       <div className="sidebar__slips">
         <ul className="appprojects">
           {projects.map((p) => {
             const active = p.project === activeProject
             const label = projectLabel(p.project)
+            const checked = selected.has(p.project)
             return (
-              <li key={p.project}>
+              <li key={p.project} className={`appproj-row${checked ? ' is-checked' : ''}`}>
+                {!collapsed && (
+                  <input
+                    type="checkbox"
+                    className="appproj-check"
+                    checked={checked}
+                    onChange={() => toggleSelected(p.project)}
+                    aria-label={`${label} 그래프에 포함`}
+                    title={`${label} 함께 보기`}
+                  />
+                )}
                 <button
                   type="button"
                   className={`appproj${active ? ' is-active' : ''}`}

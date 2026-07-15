@@ -25,11 +25,24 @@ export default function GraphModePage() {
 
   const scope: 'project' | 'all' = params.get('scope') === 'all' ? 'all' : 'project'
   const projectParam = params.get('project') ?? ''
-  // Resolve the base project: explicit ?project=, else the first available.
-  const project = projectParam || projects[0]?.project || ''
-  const galaxy = scope === 'all'
+  const projectsParam = params.get('projects')
 
-  const [meta, setMeta] = useState({ nodes: 0, edges: 0, settled: false })
+  // Which projects to render together:
+  //   ?projects=A,B  → exactly those (multi-select → 교차연결 bridges appear)
+  //   ?scope=all     → every project (galaxy)
+  //   ?scope=project&project=X (or nothing) → a single project
+  const showProjects = useMemo(() => {
+    const explicit = projectsParam ? projectsParam.split(',').map((s) => s.trim()).filter(Boolean) : []
+    if (explicit.length) return explicit
+    if (scope === 'all') return projects.map((p) => p.project)
+    const single = projectParam || projects[0]?.project
+    return single ? [single] : []
+  }, [projectsParam, scope, projectParam, projects])
+
+  const project = showProjects[0] ?? ''
+  const multi = showProjects.length > 1
+
+  const [meta, setMeta] = useState({ nodes: 0, edges: 0, settled: false, cross: 0 })
   const [panel, setPanel] = useState<'detail' | 'answer' | null>(null)
   const [askExpansion, setAskExpansion] = useState<Set<string> | null>(null)
 
@@ -38,7 +51,9 @@ export default function GraphModePage() {
   const ask = useAsk(project, setAskExpansion)
 
   const handleGraphMeta = useCallback(
-    (m: { nodes: number; edges: number; settled: boolean }) => setMeta(m),
+    (m: { nodes: number; edges: number; settled: boolean; cross?: number }) =>
+      // `cross` only rides the initial load; keep the last value on settle ticks.
+      setMeta((prev) => ({ ...prev, ...m, cross: m.cross ?? prev.cross })),
     [],
   )
   const handleSelectNode = useCallback(
@@ -68,11 +83,8 @@ export default function GraphModePage() {
     ask.clear()
   }, [detail, ask])
 
-  // Galaxy: render every OTHER project as its own far-apart hub cluster.
-  const alsoShow = useMemo(
-    () => (galaxy ? projects.map((p) => p.project).filter((p) => p !== project) : []),
-    [galaxy, projects, project],
-  )
+  // Every project after the first renders as its own far-apart hub cluster.
+  const alsoShow = useMemo(() => showProjects.slice(1), [showProjects])
 
   const drawer =
     panel === 'detail' && detail.state.status !== 'idle' ? (
@@ -95,8 +107,9 @@ export default function GraphModePage() {
               askExpansionIds={askExpansion}
             />
             <div className="hud">
-              {galaxy ? '모든 과목 · ' : ''}
-              {meta.nodes} concepts · {meta.edges} edges · {meta.settled ? 'settled' : 'settling…'}
+              {multi ? `${showProjects.length}과목 · ` : ''}
+              {meta.nodes} concepts · {meta.edges} edges
+              {meta.cross ? ` · 교차연결 ${meta.cross}` : ''} · {meta.settled ? 'settled' : 'settling…'}
             </div>
             <AskBar onSubmit={handleAsk} busy={ask.busy} />
           </>

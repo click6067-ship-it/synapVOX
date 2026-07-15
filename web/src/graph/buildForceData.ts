@@ -13,14 +13,19 @@ export type FNode = {
   bridge: boolean
   degree: number
   neighbors: Set<string>
+  project?: string // which project this node came from (set when galaxy-merging)
   x?: number
   y?: number
 }
 
+// 'cross' is a frontend-synthetic relation (shared concept across two projects),
+// not emitted by the backend — hence the widening beyond RelClass.
+export type FRelClass = RelClass | 'cross'
+
 export type FLink = {
   source: string
   target: string
-  relClass: RelClass
+  relClass: FRelClass
 }
 
 export function buildForceData(mapped: {
