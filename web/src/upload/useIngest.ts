@@ -25,6 +25,9 @@ export type UseIngest = {
   // ingest into a fresh slug); when omitted the lecture lands in `project`.
   submit: (title: string, text: string, target?: string) => void
   reset: () => void
+  // Abort the in-flight ingest (취소 button) and return to idle. The server may
+  // still finish server-side; this only stops the client from waiting/navigating.
+  cancel: () => void
 }
 
 // Timed advance 'extracting' → 'linking' (only if still in flight). Kept modest
@@ -49,6 +52,7 @@ export function useIngest(project: string, onIngested: (project: string, title: 
   const aliveRef = useRef(true)
   const busyRef = useRef(false)
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  const abortRef = useRef<AbortController | null>(null)
 
   const clearTimers = useCallback(() => {
     for (const t of timersRef.current) clearTimeout(t)
@@ -64,11 +68,23 @@ export function useIngest(project: string, onIngested: (project: string, title: 
     }
   }, [])
 
+  // Full cleanup: abort any in-flight request, drop timers, release the
+  // one-at-a-time latch, and return to idle. Doing ALL of this (not just clearing
+  // abortRef) matters — if reset() ran mid-flight without releasing busyRef, the
+  // old run()'s finally would skip the release (abortRef !== ac) and strand
+  // busyRef=true, blocking every future submit. Both 취소 and the post-'done'
+  // reset share this.
   const reset = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
     clearTimers()
+    busyRef.current = false
     setStage('idle')
     setError(null)
   }, [clearTimers])
+
+  // 취소 is the same cleanup under a caller-facing name.
+  const cancel = reset
 
   const submit = useCallback(
     (title: string, text: string, target?: string) => {
@@ -81,6 +97,8 @@ export function useIngest(project: string, onIngested: (project: string, title: 
       const dest = target ?? project
 
       clearTimers()
+      const ac = new AbortController()
+      abortRef.current = ac
       setError(null)
       setStage('extracting')
 
@@ -93,9 +111,14 @@ export function useIngest(project: string, onIngested: (project: string, title: 
       )
 
       const run = async () => {
+        // A continuation may touch shared state ONLY if THIS request is still the
+        // active one. Guards the cancel()+retry race: an old (aborted/superseded)
+        // request must never clear the new request's timers, override its stage,
+        // or fire onIngested/navigate for the wrong lecture.
+        const isCurrent = () => aliveRef.current && abortRef.current === ac
         try {
-          await ingestText(dest, title, text)
-          if (!aliveRef.current) return
+          await ingestText(dest, title, text, ac.signal)
+          if (!isCurrent()) return
           clearTimers()
           setStage('growing')
           // Refetch/grow (same project) or navigate (new project) — must never
@@ -107,12 +130,13 @@ export function useIngest(project: string, onIngested: (project: string, title: 
           }
           timersRef.current.push(
             setTimeout(() => {
-              if (!aliveRef.current) return
-              setStage('done')
+              if (isCurrent()) setStage('done')
             }, GROWING_HOLD_MS),
           )
         } catch (e) {
-          if (!aliveRef.current) return
+          // Cancelled (취소), superseded by a newer submit, or aborted → the abort
+          // is expected and the UI was already reset; stay silent.
+          if (!isCurrent() || ac.signal.aborted || (e instanceof DOMException && e.name === 'AbortError')) return
           clearTimers()
           // Known caps carry a useful backend message; show it verbatim.
           // 413 = 강의가 너무 김, 429 = 요청이 너무 잦음.
@@ -120,7 +144,9 @@ export function useIngest(project: string, onIngested: (project: string, title: 
           setError(msg)
           setStage('error')
         } finally {
-          busyRef.current = false
+          // Release the one-at-a-time latch only if we're still the current
+          // request (cancel() and a newer submit manage it otherwise).
+          if (abortRef.current === ac) busyRef.current = false
         }
       }
 
@@ -130,5 +156,5 @@ export function useIngest(project: string, onIngested: (project: string, title: 
     [project, clearTimers],
   )
 
-  return { stage, error, submit, reset }
+  return { stage, error, submit, reset, cancel }
 }

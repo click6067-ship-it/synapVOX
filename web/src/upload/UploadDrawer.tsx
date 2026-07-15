@@ -9,7 +9,7 @@
 //                     caller (GraphPage) navigates there on success.
 // Archive Graph Studio aesthetic: paper chrome, ink borders, --r-1, no
 // celebratory animation (spec §6 — the graph's Growth Ring is the moment).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import { slugify } from '../home/slug'
 import { useIngest } from './useIngest'
@@ -42,7 +42,7 @@ export function UploadDrawer(props: {
   onIngested: (project: string, title: string) => void
 }): JSX.Element | null {
   const { project, open, mode = 'add', onClose, onIngested } = props
-  const { stage, error, submit, reset } = useIngest(project, onIngested)
+  const { stage, error, submit, reset, cancel } = useIngest(project, onIngested)
 
   const isNew = mode === 'new'
   const [name, setName] = useState('')
@@ -94,7 +94,16 @@ export function UploadDrawer(props: {
     onClose()
   }
 
-  const stepIndex = STEPS.findIndex((s) => s.key === stage)
+  // 취소: abort the in-flight ingest and close (the pasted text is kept in state
+  // so reopening lets them retry). The server may still finish — see useIngest.
+  const handleCancel = () => {
+    cancel()
+    onClose()
+  }
+
+  // While the single ingest request is in flight we take over the whole screen:
+  // a centered modal (삼점 스피너 + 현재 단계) over a dimmed site, with 취소.
+  if (busy) return <IngestModal stage={stage} onCancel={handleCancel} />
 
   return (
     <div className="upload" role="dialog" aria-modal="true" aria-label={heading}>
@@ -169,30 +178,6 @@ export function UploadDrawer(props: {
           />
           {over && <p className="upload__hint">5만 자 이하로 줄여 주세요.</p>}
 
-          {busy && (
-            <div className="upload__progress" role="status" aria-live="polite">
-              <div className="upload__rail" aria-hidden="true">
-                {STEPS.map((s, i) => (
-                  <div
-                    key={s.key}
-                    className={[
-                      'upload__step',
-                      stepIndex >= i ? 'is-reached' : '',
-                      s.key === stage ? 'is-current' : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                  >
-                    <span className="upload__dot" />
-                    <span className="upload__steplabel">{s.short}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="upload__stagecopy">{STAGE_COPY[stage]}</p>
-              <p className="upload__reassure">서버를 깨우는 중일 수 있어요. 추출에 최대 1분까지 걸릴 수 있어요.</p>
-            </div>
-          )}
-
           {stage === 'error' && error && (
             <p className="upload__error" role="alert">
               {error}
@@ -218,6 +203,55 @@ export function UploadDrawer(props: {
           </footer>
         </form>
       </aside>
+    </div>
+  )
+}
+
+// ── Busy modal ───────────────────────────────────────────────────────────────
+// Shown while the single ingest request is in flight. Centered card over a dimmed
+// full-screen backdrop. The wait is INDETERMINATE (the backend gives no real
+// progress), so this is a three-dot spinner + the current phase — NOT a filling
+// progress bar (which would fake a percentage). The 추출·연결·성장 dots are an
+// honest phase indicator, not a % gauge. 취소 aborts and closes.
+function IngestModal(props: { stage: IngestStage; onCancel: () => void }): JSX.Element {
+  const { stage, onCancel } = props
+  const stepIndex = STEPS.findIndex((s) => s.key === stage)
+  // Move focus into the dialog on mount — the busy early-return removed the
+  // form/submit controls, so keyboard/SR users would otherwise be left on <body>.
+  const cancelRef = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    cancelRef.current?.focus()
+  }, [])
+  return (
+    <div className="ingest-modal" role="dialog" aria-modal="true" aria-label="강의 처리 중">
+      <div className="ingest-modal__backdrop" aria-hidden="true" />
+      <div className="ingest-modal__card">
+        <div className="ingest-modal__spinner" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        <p className="ingest-modal__phase" role="status" aria-live="polite">
+          {STAGE_COPY[stage] ?? '강의를 처리하고 있어요'}
+        </p>
+        <ol className="ingest-modal__steps" aria-hidden="true">
+          {STEPS.map((s, i) => (
+            <li
+              key={s.key}
+              className={['ingest-modal__step', stepIndex >= i ? 'is-reached' : '', s.key === stage ? 'is-current' : '']
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span className="ingest-modal__stepdot" />
+              <span className="ingest-modal__steplabel">{s.short}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="ingest-modal__reassure">서버를 깨우는 중일 수 있어요. 최대 1분까지 걸릴 수 있어요.</p>
+        <button ref={cancelRef} type="button" className="ingest-modal__cancel" onClick={onCancel}>
+          취소
+        </button>
+      </div>
     </div>
   )
 }

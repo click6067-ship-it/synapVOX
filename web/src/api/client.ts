@@ -70,8 +70,15 @@ export async function ask(project: string, q: string): Promise<AskResult> {
   )) as AskResult
 }
 
-export async function ingestText(project: string, title: string, text: string): Promise<unknown> {
-  return jsonOrThrow(await req('/ingest-text', { body: JSON.stringify({ project, title, text }) }, 'POST'))
+export async function ingestText(
+  project: string,
+  title: string,
+  text: string,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  // `signal` lets the upload modal's 취소 abort the in-flight request. (The server
+  // may still finish the ingest — cancel means "stop waiting," not "undo.")
+  return jsonOrThrow(await req('/ingest-text', { body: JSON.stringify({ project, title, text }), signal }, 'POST'))
 }
 
 // ── 상세 조회 (concept/session) ─────────────────────────────
