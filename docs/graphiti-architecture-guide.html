@@ -1,0 +1,493 @@
+<title>SynapVox 아키텍처 노트 — Graphiti · Neo4j · GraphRAG</title>
+<style>
+  :root {
+    --paper: #F4F0E7; --ink: #17160F; --sub: #706B5C; --rule: #DAD4C6; --card: #FBF8F1;
+    --canvas: #0B1A16; --canvas-ink: #ECE8DC; --canvas-sub: #8B978C; --canvas-rule: #22302A;
+    --lime: #D8FF6A; --lime-ink: #7F9327; --vermilion: #C84E3A; --blue: #2F6F86;
+    --blue-bright: #5FB6D4; --teal: #4FA3A0;
+    --accent: var(--blue); --shadow: 4px 4px 0 rgba(23,22,15,0.10);
+    --font-sans: "Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,-apple-system,"Segoe UI","Noto Sans KR",sans-serif;
+    --font-mono: "JetBrains Mono",ui-monospace,"SF Mono",Menlo,"D2Coding",monospace;
+    --maxw: 940px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:#0C1512; --ink:#ECE8DC; --sub:#93A093; --rule:#23302B; --card:#111E19;
+      --canvas:#060F0D; --lime-ink:#C3E85F; --shadow:4px 4px 0 rgba(0,0,0,0.30);
+    }
+  }
+  :root[data-theme="light"] { --paper:#F4F0E7; --ink:#17160F; --sub:#706B5C; --rule:#DAD4C6; --card:#FBF8F1; --lime-ink:#7F9327; --shadow:4px 4px 0 rgba(23,22,15,0.10); }
+  :root[data-theme="dark"]  { --paper:#0C1512; --ink:#ECE8DC; --sub:#93A093; --rule:#23302B; --card:#111E19; --canvas:#060F0D; --lime-ink:#C3E85F; --shadow:4px 4px 0 rgba(0,0,0,0.30); }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:var(--font-sans); line-height:1.6; -webkit-font-smoothing:antialiased; letter-spacing:-0.003em; }
+  .wrap { max-width:var(--maxw); margin:0 auto; padding:0 24px; }
+  h1,h2,h3 { text-wrap:balance; line-height:1.18; letter-spacing:-0.02em; font-weight:800; }
+  a { color:var(--accent); }
+  code,.mono { font-family:var(--font-mono); }
+  .eyebrow { font-family:var(--font-mono); font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--sub); margin:0; }
+
+  /* ── sticky nav ── */
+  .topnav {
+    position:sticky; top:0; z-index:50; display:flex; align-items:center; gap:16px;
+    padding:10px 24px; background:color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter:saturate(1.2) blur(8px); border-bottom:1px solid var(--rule);
+  }
+  .topnav__brand { font-family:var(--font-mono); font-size:12px; font-weight:600; letter-spacing:0.04em; }
+  .topnav__brand b { color:var(--vermilion); }
+  .topnav__links { display:flex; gap:4px; margin-left:auto; flex-wrap:wrap; }
+  .topnav__links a { font-size:12.5px; color:var(--sub); text-decoration:none; padding:5px 9px; border-radius:6px; }
+  .topnav__links a:hover { color:var(--ink); background:color-mix(in srgb, var(--ink) 6%, transparent); }
+  .topnav__links a.is-active { color:var(--ink); background:color-mix(in srgb, var(--blue) 14%, transparent); }
+  .themebtn {
+    flex:none; font-family:var(--font-mono); font-size:12px; padding:5px 10px; cursor:pointer;
+    color:var(--ink); background:transparent; border:1px solid var(--rule); border-radius:6px;
+  }
+  .themebtn:hover { border-color:var(--ink); }
+
+  /* ── hero ── */
+  .hero { background:var(--canvas); color:var(--canvas-ink); border-bottom:2px solid var(--ink); position:relative; overflow:hidden; }
+  .hero__glow { position:absolute; inset:0; background:radial-gradient(60% 80% at 78% 30%, rgba(216,255,106,0.10), transparent 60%), radial-gradient(50% 70% at 20% 90%, rgba(47,111,134,0.16), transparent 60%); pointer-events:none; }
+  .hero__inner { max-width:var(--maxw); margin:0 auto; padding:60px 24px 52px; position:relative; display:grid; grid-template-columns:1.35fr 1fr; gap:32px; align-items:center; }
+  .hero__eyebrow { color:var(--canvas-sub); }
+  .hero h1 { font-size:clamp(30px,5.2vw,50px); margin:14px 0 0; }
+  .hero h1 .accent { color:var(--lime); }
+  .hero__lead { margin:18px 0 0; font-size:17px; color:#C9D2C7; max-width:42ch; }
+  .hero__meta { margin-top:22px; display:flex; flex-wrap:wrap; gap:8px; }
+  .chip { font-family:var(--font-mono); font-size:12px; padding:4px 10px; border:1px solid var(--canvas-rule); border-radius:999px; color:#B9C3B8; }
+  .hero__art { justify-self:center; width:100%; max-width:300px; }
+  .hero__art svg { width:100%; height:auto; display:block; }
+
+  section { padding:58px 0; border-bottom:1px solid var(--rule); }
+  .sec-head { margin-bottom:28px; }
+  .sec-head h2 { font-size:clamp(22px,3.4vw,30px); margin:8px 0 0; }
+  .sec-head p { margin:10px 0 0; color:var(--sub); max-width:62ch; }
+  .n { color:var(--vermilion); font-family:var(--font-mono); font-weight:700; }
+
+  /* ── architecture stack ── */
+  .stack { display:flex; flex-direction:column; }
+  .layer { display:grid; grid-template-columns:132px 1fr; gap:18px; align-items:center; padding:16px 18px; background:var(--card); border:1px solid var(--rule); border-radius:8px; margin-bottom:10px; }
+  .layer__tag { font-family:var(--font-mono); font-size:12px; font-weight:600; padding:6px 8px; border-radius:6px; text-align:center; border:1px solid currentColor; white-space:nowrap; }
+  .t-front{color:var(--teal);} .t-api{color:var(--vermilion);} .t-graphiti{color:var(--lime-ink);border-color:var(--lime-ink);} .t-ai{color:var(--blue);} .t-db{color:var(--ink);}
+  .layer__body strong { display:block; font-size:15.5px; }
+  .layer__body span { color:var(--sub); font-size:14px; }
+  .layer.is-core { border-color:var(--lime-ink); box-shadow:var(--shadow); }
+  .stack__note { margin-top:6px; font-size:13.5px; color:var(--sub); }
+  .stack__note b { color:var(--ink); }
+
+  /* ── workflows ── */
+  .flows { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  .flow { background:var(--card); border:1px solid var(--rule); border-radius:10px; overflow:hidden; }
+  .flow__head { padding:16px 20px; border-bottom:1px solid var(--rule); }
+  .flow__head .k { font-family:var(--font-mono); font-size:12px; color:var(--sub); }
+  .flow__head h3 { font-size:18px; margin:4px 0 0; }
+  .flow--write .bar { height:4px; background:var(--vermilion); }
+  .flow--read .bar { height:4px; background:var(--blue); }
+  .steps { list-style:none; margin:0; padding:14px 20px 20px; display:flex; flex-direction:column; }
+  .steps li { position:relative; padding:10px 0 10px 30px; }
+  .steps li::before { content:""; position:absolute; left:7px; top:16px; width:9px; height:9px; border-radius:50%; background:var(--paper); border:2px solid var(--accent); }
+  .flow--write .steps li::before { border-color:var(--vermilion); }
+  .steps li:not(:last-child)::after { content:""; position:absolute; left:11px; top:24px; bottom:-2px; width:2px; background:var(--rule); }
+  .steps b { font-size:14.5px; }
+  .steps .who { font-family:var(--font-mono); font-size:11px; color:var(--sub); display:block; margin-top:1px; }
+  .flow__foot { padding:12px 20px 18px; font-size:13px; color:var(--sub); border-top:1px dashed var(--rule); }
+  .flow__foot b { color:var(--ink); }
+  .aside-note { margin-top:22px; padding:16px 20px; border-left:3px solid var(--blue-bright); background:var(--card); border-radius:0 8px 8px 0; font-size:14px; }
+  .aside-note b { color:var(--ink); }
+
+  /* ── interactive graph demo ── */
+  .demo { display:grid; grid-template-columns:1.15fr 0.85fr; gap:24px; align-items:start; }
+  .demo__stage { position:relative; background:var(--canvas); border:2px solid var(--ink); border-radius:12px; overflow:hidden; }
+  .demo__stage svg { width:100%; height:auto; display:block; }
+  .demo__cap { padding:12px 16px; font-family:var(--font-mono); font-size:12.5px; color:var(--canvas-ink); background:rgba(0,0,0,0.25); border-top:1px solid var(--canvas-rule); min-height:42px; display:flex; align-items:center; }
+  .demo__side { display:flex; flex-direction:column; gap:16px; }
+  .demo__controls { display:flex; flex-wrap:wrap; gap:8px; }
+  .btn { font-family:var(--font-sans); font-size:13.5px; font-weight:600; padding:9px 14px; cursor:pointer; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:var(--paper); transition:filter .15s ease; }
+  .btn:hover { filter:brightness(1.15); }
+  .btn--ghost { background:transparent; color:var(--ink); }
+  .btn--ghost:hover { background:color-mix(in srgb, var(--ink) 8%, transparent); filter:none; }
+  .btn:focus-visible { outline:2px solid var(--blue-bright); outline-offset:2px; }
+  .legend { border:1px solid var(--rule); border-radius:10px; padding:16px; background:var(--card); }
+  .legend h3 { font-size:13px; margin:0 0 12px; font-family:var(--font-mono); letter-spacing:0.06em; text-transform:uppercase; color:var(--sub); }
+  .legend ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  .legend li { display:flex; align-items:center; gap:10px; font-size:13px; }
+  .lg { width:16px; height:16px; flex:none; border-radius:50%; }
+  .lg--hub { background:#F4F0E7; border:1px solid #999; }
+  .lg--sess { border:2px solid var(--vermilion); }
+  .lg--key { border:2px solid var(--lime-ink); }
+  .lg--leaf { border:2px solid var(--teal); }
+  .lg--edge { width:22px; height:0; border-top:2px solid var(--blue); border-radius:0; }
+  .lg--cross { width:22px; height:0; border-top:2px dashed var(--blue-bright); border-radius:0; }
+  .demo__hint { font-size:12.5px; color:var(--sub); }
+  /* svg node/edge states */
+  #kg .edge { stroke:var(--blue); stroke-width:1.5; transition:opacity .45s ease, stroke-width .3s ease; }
+  #kg .edge.cross { stroke:var(--blue-bright); stroke-dasharray:5 4; }
+  #kg .node circle.core { transition:opacity .45s ease, r .3s ease, stroke-width .3s ease; }
+  #kg .node text { font-family:var(--font-mono); font-size:11px; fill:var(--canvas-ink); pointer-events:none; transition:opacity .45s ease; }
+  #kg .node { cursor:pointer; }
+  #kg .node.hub circle.core { fill:#F4F0E7; stroke:none; }
+  #kg .node.sess circle.core { fill:none; stroke:var(--vermilion); stroke-width:2.4; }
+  #kg .node.key circle.core { fill:none; stroke:var(--lime); stroke-width:2.4; }
+  #kg .node.leaf circle.core { fill:none; stroke:var(--teal); stroke-width:2.4; }
+  #kg .node.hidden, #kg .edge.hidden { opacity:0; }
+  #kg .node.dim, #kg .edge.dim { opacity:0.16; }
+  #kg .node.lit circle.core { stroke-width:3.4; }
+  #kg .node .ring { fill:none; stroke:var(--blue-bright); stroke-width:2; opacity:0; }
+  #kg .node.lit .ring { opacity:1; animation:pulse 1.3s ease-out infinite; }
+  @keyframes pulse { 0%{ r:14; opacity:.8; } 100%{ r:26; opacity:0; } }
+  #kg .node:hover circle.core { stroke-width:3.6; }
+  .kgTip { position:absolute; pointer-events:none; z-index:5; transform:translate(-50%,-140%); background:rgba(7,18,15,0.95); border:1px solid var(--canvas-rule); border-radius:6px; padding:6px 9px; opacity:0; transition:opacity .12s; white-space:nowrap; }
+  .kgTip.show { opacity:1; }
+  .kgTip b { display:block; font-size:12.5px; color:#F4F0E7; }
+  .kgTip span { font-family:var(--font-mono); font-size:10.5px; color:#9aa39c; }
+
+  /* ── concept cards ── */
+  .cards { display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+  .concept { background:var(--card); border:1px solid var(--rule); border-radius:10px; padding:18px 20px; display:flex; flex-direction:column; gap:8px; }
+  .concept__top { display:flex; align-items:baseline; gap:10px; }
+  .dot { width:11px; height:11px; border-radius:50%; flex:none; }
+  .dot--lime{ border:2px solid var(--lime-ink);} .dot--verm{ border:2px solid var(--vermilion);} .dot--blue{ background:var(--blue);} .dot--teal{ border:2px solid var(--teal);} .dot--ink{ background:var(--ink);}
+  .concept h3 { font-size:16px; margin:0; }
+  .concept h3 .en { font-family:var(--font-mono); font-size:12px; color:var(--sub); font-weight:500; margin-left:6px; letter-spacing:0; }
+  .concept .def { margin:0; font-size:14px; }
+  .concept .inproj { margin:2px 0 0; font-size:13px; color:var(--sub); padding-top:8px; border-top:1px dashed var(--rule); }
+  .concept .inproj b { color:var(--vermilion); font-family:var(--font-mono); font-size:11px; letter-spacing:0.04em; }
+
+  /* ── project principles ── */
+  .princ { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .princ > div { padding:18px 20px; border:1px solid var(--rule); border-radius:10px; background:var(--card); }
+  .princ h3 { font-size:15.5px; margin:0 0 6px; }
+  .princ p { margin:0; font-size:14px; color:var(--sub); }
+  .princ p b { color:var(--ink); }
+
+  /* ── roadmap ── */
+  .road { list-style:none; margin:0; padding:0; counter-reset:step; }
+  .road li { display:grid; grid-template-columns:44px 1fr; gap:18px; align-items:start; padding:18px 0; border-top:1px solid var(--rule); }
+  .road li:first-child { border-top:none; }
+  .road li::before { counter-increment:step; content:counter(step,decimal-leading-zero); font-family:var(--font-mono); font-size:15px; font-weight:700; color:var(--vermilion); padding-top:2px; }
+  .road h3 { font-size:16px; margin:0 0 4px; }
+  .road p { margin:0; font-size:14px; color:var(--sub); }
+  .road .why { color:var(--lime-ink); font-family:var(--font-mono); font-size:11.5px; }
+
+  .tldr { background:var(--canvas); color:var(--canvas-ink); border-radius:12px; padding:26px 28px; margin-top:8px; }
+  .tldr .eyebrow { color:var(--lime); }
+  .tldr p { font-size:16px; margin:10px 0 0; color:#D3DBD0; }
+  .tldr p b { color:#fff; }
+  footer { padding:40px 0 60px; color:var(--sub); font-size:13px; }
+
+  a:focus-visible, button:focus-visible { outline:2px solid var(--blue-bright); outline-offset:3px; }
+  @media (prefers-reduced-motion: reduce) { html{scroll-behavior:auto;} #kg .node.lit .ring{ animation:none; opacity:.5; } * { transition-duration:.01ms !important; } }
+  @media (max-width:860px) {
+    .hero__inner { grid-template-columns:1fr; }
+    .hero__art { order:-1; max-width:220px; }
+    .flows, .cards, .princ, .demo { grid-template-columns:1fr; }
+    .layer { grid-template-columns:100px 1fr; gap:12px; }
+    .topnav__links { display:none; }
+  }
+</style>
+
+<nav class="topnav">
+  <span class="topnav__brand">Synap<b>Vox</b> · 아키텍처 노트</span>
+  <div class="topnav__links">
+    <a href="#s-arch">큰그림</a>
+    <a href="#s-flow">워크플로우</a>
+    <a href="#s-demo">실습</a>
+    <a href="#s-dict">개념</a>
+    <a href="#s-road">로드맵</a>
+  </div>
+  <button class="themebtn" id="themeToggle" type="button" aria-label="라이트/다크 테마 전환">◐ 테마</button>
+</nav>
+
+<header class="hero">
+  <div class="hero__glow" aria-hidden="true"></div>
+  <div class="hero__inner">
+    <div>
+      <p class="eyebrow hero__eyebrow">SynapVox · 아키텍처 노트</p>
+      <h1>지식그래프 <span class="accent">RAG</span>는<br>어떻게 작동하는가</h1>
+      <p class="hero__lead">코드가 아니라 원리로. 이 프로젝트에 쓰인 Graphiti · Neo4j · GraphRAG를 거시 아키텍처 관점에서, 사람이 공부할 순서로.</p>
+      <div class="hero__meta">
+        <span class="chip">Graphiti</span><span class="chip">Neo4j</span><span class="chip">GraphRAG</span><span class="chip">Embeddings</span><span class="chip">Hybrid Search</span>
+      </div>
+    </div>
+    <div class="hero__art" role="img" aria-label="지식그래프 도식: 강의 노드, 개념 노드, 이들을 잇는 관계">
+      <svg viewBox="0 0 300 300" fill="none">
+        <g stroke="#2F6F86" stroke-width="1.4" opacity="0.8">
+          <line x1="150" y1="150" x2="88" y2="80"/><line x1="150" y1="150" x2="228" y2="96"/>
+          <line x1="150" y1="150" x2="210" y2="212"/><line x1="150" y1="150" x2="76" y2="200"/>
+          <line x1="88" y1="80" x2="228" y2="96"/><line x1="210" y1="212" x2="76" y2="200"/>
+        </g>
+        <line x1="88" y1="80" x2="210" y2="212" stroke="#5FB6D4" stroke-width="1.4" stroke-dasharray="5 4" opacity="0.9"/>
+        <circle cx="150" cy="150" r="15" fill="#F4F0E7"/>
+        <circle cx="88" cy="80" r="9" fill="none" stroke="#C84E3A" stroke-width="2.2"/>
+        <circle cx="76" cy="200" r="8" fill="none" stroke="#C84E3A" stroke-width="2.2"/>
+        <circle cx="228" cy="96" r="8.5" fill="none" stroke="#D8FF6A" stroke-width="2.2"/>
+        <circle cx="210" cy="212" r="7" fill="none" stroke="#4FA3A0" stroke-width="2.2"/>
+        <circle cx="252" cy="168" r="5" fill="none" stroke="#4FA3A0" stroke-width="2"/>
+        <line x1="228" y1="96" x2="252" y2="168" stroke="#2F6F86" stroke-width="1.2" opacity="0.6"/>
+      </svg>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section id="s-arch">
+    <div class="sec-head">
+      <p class="eyebrow"><span class="n">01</span> · 큰 그림</p>
+      <h2>누가 무엇을 하나 — 6개 레이어</h2>
+      <p>핵심은 <b>Graphiti가 DB가 아니라, Neo4j(창고)와 OpenAI(두뇌) 사이에서 그래프를 만들고 검색하는 "조수" 레이어</b>라는 점입니다.</p>
+    </div>
+    <div class="stack">
+      <div class="layer"><span class="layer__tag t-front">브라우저</span><div class="layer__body"><strong>React 앱 (react-force-graph)</strong><span>화면·그래프 시각화·질문 입력. 그래프를 캔버스에 그림.</span></div></div>
+      <div class="layer"><span class="layer__tag t-front">Vercel</span><div class="layer__body"><strong>프론트엔드 정적 호스팅</strong><span>빌드된 HTML/JS를 CDN으로 배급. 로직은 브라우저에서.</span></div></div>
+      <div class="layer"><span class="layer__tag t-api">FastAPI</span><div class="layer__body"><strong>백엔드 API (Render)</strong><span>모든 요청의 창구. 인증·사용량 한도·라우팅. 직접 계산은 아래로 넘김.</span></div></div>
+      <div class="layer is-core"><span class="layer__tag t-graphiti">Graphiti</span><div class="layer__body"><strong>지식그래프 프레임워크 ★ 핵심</strong><span>글 → 개념·관계 추출(쓰기) / 하이브리드 검색(읽기). Neo4j·OpenAI를 부린다.</span></div></div>
+      <div class="layer"><span class="layer__tag t-ai">OpenAI</span><div class="layer__body"><strong>gpt-5.6 + 임베딩 모델</strong><span>실제 언어 이해/생성. 개념 추출·답변 생성·의미 벡터화를 담당하는 두뇌.</span></div></div>
+      <div class="layer"><span class="layer__tag t-db">Neo4j</span><div class="layer__body"><strong>그래프 데이터베이스 (Aura)</strong><span>진짜 저장소. 노드(점)·엣지(선)로 데이터가 실제로 쌓이는 창고.</span></div></div>
+    </div>
+    <p class="stack__note">★ 한 줄로: <b>Graphiti = Neo4j(창고) 위에서 OpenAI(두뇌)를 써서 "지식그래프를 채우고 검색"하는 라이브러리.</b></p>
+  </section>
+
+  <section id="s-flow">
+    <div class="sec-head">
+      <p class="eyebrow"><span class="n">02</span> · 워크플로우</p>
+      <h2>일어나는 일은 딱 두 가지</h2>
+      <p>데이터를 <b>넣을 때(쓰기)</b>와 <b>꺼낼 때(읽기=RAG)</b>. 이 두 흐름만 이해하면 시스템의 90%가 잡힙니다.</p>
+    </div>
+    <div class="flows">
+      <div class="flow flow--write"><div class="bar"></div>
+        <div class="flow__head"><span class="k">강의 추가 · POST /ingest-text</span><h3>① 넣기 — 글을 그래프로</h3></div>
+        <ol class="steps">
+          <li><b>강의 텍스트 투입</b><span class="who">사용자가 노트 붙여넣기</span></li>
+          <li><b>LLM이 개념·관계 추출</b><span class="who">Graphiti.add_episode → gpt-5.6</span></li>
+          <li><b>각 개념을 임베딩(벡터)로</b><span class="who">OpenAI 임베딩 · 3072차원</span></li>
+          <li><b>중복 개념 합치기</b><span class="who">"경사하강법" 두 번 → 한 노드</span></li>
+          <li><b>노드·엣지로 Neo4j에 저장</b><span class="who">:Episodic·:Entity · MENTIONS·RELATES_TO</span></li>
+        </ol>
+        <div class="flow__foot">결과: 어지러운 글이 <b>개념 지도</b>가 되어 창고에 쌓임. 사람이 태깅 안 함 — LLM이 자동으로.</div>
+      </div>
+      <div class="flow flow--read"><div class="bar"></div>
+        <div class="flow__head"><span class="k">질문하기 · GET /ask</span><h3>② 꺼내기 — 이게 RAG</h3></div>
+        <ol class="steps">
+          <li><b>질문 입력</b><span class="who">"역전파가 왜 필요해?"</span></li>
+          <li><b>하이브리드 검색으로 근거 찾기</b><span class="who">Graphiti.search — 의미+키워드+그래프</span></li>
+          <li><b>관련 사실·근거 세션 확보</b><span class="who">R · Retrieval(찾기)</span></li>
+          <li><b>근거를 gpt-5.6에 넣어 답 생성</b><span class="who">G · Generation(답하기)</span></li>
+          <li><b>답변 + 근거 세션 + 그래프 하이라이트</b><span class="who">근거 개념에 파란 링</span></li>
+        </ol>
+        <div class="flow__foot"><b>RAG = 찾기(R) + 답하기(G).</b> LLM이 지어내지 않고 <b>내 강의를 근거</b>로 답하는 이유.</div>
+      </div>
+    </div>
+    <div class="aside-note"><b>곁가지 — "그래프 시각화"는 RAG가 아니다.</b> <code>GET /graph</code>는 검색도 LLM도 안 씀. 창고(Neo4j)에 <b>이미 저장된 개념 지도를 Cypher로 그냥 읽어 그리는 것</b>뿐 — 즉각적이고 AI 비용 0.</div>
+  </section>
+
+  <section id="s-demo">
+    <div class="sec-head">
+      <p class="eyebrow"><span class="n">03</span> · 직접 해보기</p>
+      <h2>그래프 실습 — 넣기·꺼내기를 눈으로</h2>
+      <p>노드에 마우스를 올리면 정체(강의·개념·관계)를 알려줍니다. 버튼으로 <b>① 넣기</b>(그래프가 자라남)와 <b>② 질문=RAG</b>(근거가 켜짐)를 시연해 보세요.</p>
+    </div>
+    <div class="demo">
+      <div class="demo__stage">
+        <div class="kgTip" id="kgTip" aria-hidden="true"></div>
+        <svg id="kg" viewBox="0 0 600 400" role="img" aria-label="상호작용 지식그래프: 딥러닝 과목 허브에 두 강의와 개념들이 연결된 예시">
+          <g id="kgEdges">
+            <line class="edge" data-a="hub" data-b="s1" x1="300" y1="200" x2="180" y2="96"/>
+            <line class="edge" data-a="hub" data-b="s2" x1="300" y1="200" x2="452" y2="120"/>
+            <line class="edge" data-a="s1" data-b="c-gd" x1="180" y1="96" x2="110" y2="250"/>
+            <line class="edge" data-a="s1" data-b="c-loss" x1="180" y1="96" x2="250" y2="300"/>
+            <line class="edge" data-a="s1" data-b="c-bp" x1="180" y1="96" x2="96" y2="150"/>
+            <line class="edge" data-a="s2" data-b="c-lr" x1="452" y1="120" x2="486" y2="256"/>
+            <line class="edge" data-a="s2" data-b="c-of" x1="452" y1="120" x2="392" y2="316"/>
+            <line class="edge" data-a="c-gd" data-b="c-loss" x1="110" y1="250" x2="250" y2="300"/>
+            <line class="edge" data-a="c-bp" data-b="c-loss" x1="96" y1="150" x2="250" y2="300"/>
+            <line class="edge cross" data-a="c-gd" data-b="c-lr" x1="110" y1="250" x2="486" y2="256"/>
+          </g>
+          <g id="kgNodes">
+            <g class="node hub" data-id="hub" data-order="0" data-label="딥러닝" data-type="과목 허브 (galaxy hub)" transform="translate(300,200)"><circle class="ring" r="14"></circle><circle class="core" r="15"></circle><text x="0" y="30" text-anchor="middle">딥러닝</text></g>
+            <g class="node sess" data-id="s1" data-order="1" data-label="3주차 강의" data-type="강의 · :Episodic" transform="translate(180,96)"><circle class="ring" r="12"></circle><circle class="core" r="10"></circle><text x="0" y="-16" text-anchor="middle">3주차</text></g>
+            <g class="node sess" data-id="s2" data-order="4" data-label="5주차 강의" data-type="강의 · :Episodic" transform="translate(452,120)"><circle class="ring" r="12"></circle><circle class="core" r="10"></circle><text x="0" y="-16" text-anchor="middle">5주차</text></g>
+            <g class="node key" data-id="c-gd" data-order="2" data-label="경사하강법" data-type="핵심 개념 · :Entity" transform="translate(110,250)"><circle class="ring" r="12"></circle><circle class="core" r="9"></circle><text x="0" y="26" text-anchor="middle">경사하강법</text></g>
+            <g class="node key" data-id="c-loss" data-order="2" data-label="손실함수" data-type="핵심 개념 · :Entity" transform="translate(250,300)"><circle class="ring" r="12"></circle><circle class="core" r="9"></circle><text x="0" y="26" text-anchor="middle">손실함수</text></g>
+            <g class="node leaf" data-id="c-bp" data-order="3" data-label="역전파" data-type="개념 · :Entity" transform="translate(96,150)"><circle class="ring" r="11"></circle><circle class="core" r="7"></circle><text x="0" y="-14" text-anchor="middle">역전파</text></g>
+            <g class="node leaf" data-id="c-lr" data-order="5" data-label="학습률" data-type="개념 · :Entity" transform="translate(486,256)"><circle class="ring" r="11"></circle><circle class="core" r="7"></circle><text x="0" y="24" text-anchor="middle">학습률</text></g>
+            <g class="node leaf" data-id="c-of" data-order="5" data-label="과적합" data-type="개념 · :Entity" transform="translate(392,316)"><circle class="ring" r="11"></circle><circle class="core" r="7"></circle><text x="0" y="24" text-anchor="middle">과적합</text></g>
+          </g>
+        </svg>
+        <div class="demo__cap" id="kgCap" aria-live="polite">노드에 마우스를 올려보세요 — 강의·개념·관계가 무엇인지 알려줍니다.</div>
+      </div>
+      <div class="demo__side">
+        <div class="demo__controls">
+          <button class="btn" id="btnIngest" type="button">① 넣기 시연 ▸</button>
+          <button class="btn" id="btnAsk" type="button">② 질문(RAG) 시연 ▸</button>
+          <button class="btn btn--ghost" id="btnReset" type="button">리셋</button>
+        </div>
+        <div class="legend">
+          <h3>범례</h3>
+          <ul>
+            <li><span class="lg lg--hub"></span> 과목 허브 (딥러닝)</li>
+            <li><span class="lg lg--sess"></span> 강의 · :Episodic</li>
+            <li><span class="lg lg--key"></span> 핵심 개념 (여러 강의에 등장)</li>
+            <li><span class="lg lg--leaf"></span> 일반 개념 · :Entity</li>
+            <li><span class="lg lg--edge"></span> 관계 (MENTIONS / RELATES_TO)</li>
+            <li><span class="lg lg--cross"></span> 교차연결 (과목 간 공유 개념)</li>
+          </ul>
+        </div>
+        <p class="demo__hint">① 넣기 = <b>add_episode</b>가 개념을 뽑아 그래프를 세우는 과정. ② 질문 = <b>search</b>가 근거를 켜고 gpt-5.6이 답하는 RAG.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="s-dict">
+    <div class="sec-head">
+      <p class="eyebrow"><span class="n">04</span> · 개념 사전</p>
+      <h2>핵심 용어의 원리</h2>
+      <p>각 개념 = 무엇인지 한 줄 + 이 프로젝트에서 어떻게 쓰이는지.</p>
+    </div>
+    <div class="cards">
+      <div class="concept"><div class="concept__top"><span class="dot dot--ink"></span><h3>그래프 DB <span class="en">Neo4j</span></h3></div><p class="def">데이터를 표(행·열)가 아니라 <b>점(노드)+선(엣지)</b>으로 저장. 관계 탐색이 빠름. 질의어는 <code>Cypher</code>.</p><p class="inproj"><b>여기선</b> Neo4j Aura(클라우드)에 그래프가 실제 저장.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--verm"></span><h3>노드 · 엣지 <span class="en">nodes · edges</span></h3></div><p class="def">노드=사물(강의·개념), 엣지=관계. 엣지는 방향과 "사실(fact)"을 가짐.</p><p class="inproj"><b>여기선</b> :Episodic·:Entity 노드, MENTIONS·RELATES_TO 엣지.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--lime"></span><h3>지식그래프 <span class="en">Knowledge Graph</span></h3></div><p class="def">개념과 관계를 구조화한 그래프. 문서뭉치가 아니라 <b>연결된 지식망</b>이라 관계형 질문에 강함.</p><p class="inproj"><b>여기선</b> 강의에서 뽑은 개념들의 과목별 지식망.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--teal"></span><h3>임베딩 <span class="en">embedding</span></h3></div><p class="def">글의 <b>의미를 숫자 벡터</b>로(3072차원). 뜻이 비슷하면 벡터가 가까움 → 단어 달라도 의미로 검색.</p><p class="inproj"><b>여기선</b> 개념마다 임베딩 저장 → 의미 검색 재료.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--teal"></span><h3>의미검색 vs 키워드 <span class="en">semantic · BM25</span></h3></div><p class="def"><b>의미검색</b>=임베딩 거리, <b>BM25</b>=단어일치. 강점이 달라 둘 다.</p><p class="inproj"><b>여기선</b> Graphiti가 둘을 함께 돌림.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--blue"></span><h3>하이브리드 검색 <span class="en">hybrid search</span></h3></div><p class="def">의미+BM25+<b>그래프 순회</b>를 합치고 <code>RRF</code>로 재순위. Graphiti 검색의 핵심.</p><p class="inproj"><b>여기선</b> /ask가 이 검색으로 근거를 모음.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--blue"></span><h3>RAG <span class="en">Retrieval-Augmented Generation</span></h3></div><p class="def">LLM에 <b>근거를 먼저 찾아 붙여</b> 답하게 함. 환각↓, 출처 있는 답.</p><p class="inproj"><b>여기선</b> 질문→그래프 검색→근거→gpt-5.6 답변.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--lime"></span><h3>GraphRAG <span class="en">graph + RAG</span></h3></div><p class="def">RAG인데 검색 대상이 <b>지식그래프</b>. 관계 따라가며 근거 수집 → 다개념 질문에 강함.</p><p class="inproj"><b>여기선</b> 벡터청크 대신 개념그래프를 검색.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--verm"></span><h3>Temporal <span class="en">시계열 인식</span></h3></div><p class="def">각 사실에 <b>시점</b>을 붙여 "언제 참이었나" 추적. Graphiti가 temporal인 이유.</p><p class="inproj"><b>여기선</b> 강의 순서(seq)를 시간축으로 매핑.</p></div>
+      <div class="concept"><div class="concept__top"><span class="dot dot--ink"></span><h3>group_id <span class="en">네임스페이스</span></h3></div><p class="def">하나의 DB 안에서 그래프를 <b>과목별로 격리</b>하는 칸막이.</p><p class="inproj"><b>여기선</b> group_id=project(딥러닝·최적화개론…). 안 섞임.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <p class="eyebrow"><span class="n">05</span> · 이 프로젝트 고유</p>
+      <h2>SynapVox만의 장치</h2>
+      <p>일반 GraphRAG 위에 이 앱이 얹은 것들.</p>
+    </div>
+    <div class="princ">
+      <div><h3>교차연결 (cross-connection)</h3><p>두 과목을 함께 볼 때, <b>정규화한 개념 이름이 정확히 같으면</b> 프론트에서 파란 점선으로 이음. "딥러닝∩머신러닝=경사하강법" 같은 연결점. 백엔드 아닌 브라우저에서 계산.</p></div>
+      <div><h3>그래프 시각화 ≠ 검색</h3><p>화면의 그래프는 <b>Neo4j를 Cypher로 직접 읽은 것</b>. 검색·LLM 안 씀 → 빠르고 무료. 검색은 오직 질문할 때.</p></div>
+      <div><h3>콜드 스타트</h3><p>백엔드(Render 무료)가 유휴 시 잠들어 첫 요청에 <b>최대 ~50초</b> 깨는 시간. 그래서 처리 모달이 "서버 깨우는 중" 안내.</p></div>
+      <div><h3>표시 이름 (SvxProject)</h3><p>group_id는 ASCII만 → 한글 못 씀. 그래서 사람이 읽는 이름을 <b>별도 노드에 저장</b>해 /projects가 돌려줌(모든 기기 한글).</p></div>
+    </div>
+  </section>
+
+  <section id="s-road">
+    <div class="sec-head">
+      <p class="eyebrow"><span class="n">06</span> · 공부 로드맵</p>
+      <h2>이 순서로 공부하면 됩니다</h2>
+      <p>아래로 갈수록 위를 조립. 마지막에 <code>gsvx/engine.py</code>를 다시 읽으면 코드가 "개념의 조립"으로 보일 거예요.</p>
+    </div>
+    <ol class="road">
+      <li><div><h3>그래프 DB 기본</h3><p>노드·엣지·Cypher, 표 DB와의 차이. <span class="why">→ Neo4j 공식 튜토리얼(무료 샌드박스).</span></p></div></li>
+      <li><div><h3>임베딩 &amp; 벡터 검색</h3><p>의미를 벡터로, 가까움=비슷함. <span class="why">→ 임베딩·코사인 유사도 개념.</span></p></div></li>
+      <li><div><h3>RAG 기본</h3><p>LLM에 근거를 붙이는 이유(환각↓). <span class="why">→ "RAG 개요" 입문 자료 1개.</span></p></div></li>
+      <li><div><h3>지식그래프 &amp; GraphRAG</h3><p>왜 청크 대신 그래프인가. <span class="why">→ GraphRAG 개념 글 1–2개.</span></p></div></li>
+      <li><div><h3>Graphiti 문서</h3><p>API 두 개: <code>add_episode</code>·<code>search</code> + temporal·group_ids. <span class="why">→ help.getzep.com/graphiti.</span></p></div></li>
+      <li><div><h3>이 repo의 engine.py 재독</h3><p>이제 코드가 위 개념의 조립으로 보임. <span class="why">→ gsvx/engine.py · gsvx/api.py.</span></p></div></li>
+    </ol>
+  </section>
+
+  <section style="border-bottom:none;">
+    <div class="tldr">
+      <p class="eyebrow">한 문장 요약</p>
+      <p><b>Graphiti</b>는 Neo4j(창고) 위에서 OpenAI(두뇌)로 <b>글을 개념그래프로 저장</b>하고 <b>하이브리드로 검색</b>하는 프레임워크. <b>넣기</b>=LLM추출→저장, <b>질문</b>=검색→LLM답변 = <b>GraphRAG</b>. 그래프 그림 보기는 그냥 창고 조회일 뿐 RAG가 아니다.</p>
+    </div>
+  </section>
+
+  <footer>SynapVox 아키텍처 노트 · gsvx/engine.py + Graphiti 공식 문서 기준. 코드는 AI가 짜도, 원리는 사람이. · 오프라인 실행 가능(단일 HTML).</footer>
+</main>
+
+<script>
+(function(){
+  var root = document.documentElement;
+  /* theme toggle */
+  var tbtn = document.getElementById('themeToggle');
+  function apply(t){ if(t){ root.setAttribute('data-theme', t); } else { root.removeAttribute('data-theme'); } }
+  try { var saved = localStorage.getItem('svx-theme'); if(saved) apply(saved); } catch(e){}
+  if(tbtn) tbtn.addEventListener('click', function(){
+    var cur = root.getAttribute('data-theme');
+    var mq = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var eff = cur || (mq ? 'dark' : 'light');
+    var next = eff === 'dark' ? 'light' : 'dark';
+    apply(next);
+    try { localStorage.setItem('svx-theme', next); } catch(e){}
+  });
+
+  /* scrollspy */
+  var links = Array.prototype.slice.call(document.querySelectorAll('.topnav__links a'));
+  var map = {}; links.forEach(function(a){ map[a.getAttribute('href').slice(1)] = a; });
+  if('IntersectionObserver' in window){
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){ if(en.isIntersecting){ links.forEach(function(l){l.classList.remove('is-active');}); if(map[en.target.id]) map[en.target.id].classList.add('is-active'); } });
+    }, { rootMargin:'-45% 0px -50% 0px' });
+    Object.keys(map).forEach(function(id){ var el=document.getElementById(id); if(el) obs.observe(el); });
+  }
+
+  /* interactive graph */
+  var svg = document.getElementById('kg'); if(!svg) return;
+  var nodes = Array.prototype.slice.call(svg.querySelectorAll('.node'));
+  var edges = Array.prototype.slice.call(svg.querySelectorAll('.edge'));
+  var tip = document.getElementById('kgTip'), cap = document.getElementById('kgCap');
+  var timers = [], reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function clearTimers(){ timers.forEach(clearTimeout); timers = []; }
+  function byId(id){ return svg.querySelector('.node[data-id="'+id+'"]'); }
+
+  nodes.forEach(function(n){
+    n.addEventListener('mouseenter', function(){
+      tip.innerHTML = '<b>'+n.getAttribute('data-label')+'</b><span>'+n.getAttribute('data-type')+'</span>';
+      tip.classList.add('show');
+    });
+    n.addEventListener('mousemove', function(e){
+      var r = svg.getBoundingClientRect();
+      tip.style.left = (e.clientX - r.left) + 'px';
+      tip.style.top = (e.clientY - r.top) + 'px';
+    });
+    n.addEventListener('mouseleave', function(){ tip.classList.remove('show'); });
+  });
+
+  function reset(){
+    clearTimers();
+    nodes.forEach(function(n){ n.classList.remove('hidden','dim','lit'); });
+    edges.forEach(function(e){ e.classList.remove('hidden','dim','lit'); });
+    cap.textContent = '노드에 마우스를 올려보세요 — 강의·개념·관계가 무엇인지 알려줍니다.';
+  }
+  function ingest(){
+    clearTimers();
+    cap.textContent = 'LLM이 강의에서 개념을 추출해 그래프로 쌓는 중…';
+    var ordered = nodes.slice().sort(function(a,b){ return (+a.getAttribute('data-order')) - (+b.getAttribute('data-order')); });
+    nodes.forEach(function(n){ n.classList.add('hidden'); n.classList.remove('dim','lit'); });
+    edges.forEach(function(e){ e.classList.add('hidden'); e.classList.remove('dim','lit'); });
+    var step = reduce ? 0 : 420;
+    ordered.forEach(function(n,i){
+      timers.push(setTimeout(function(){
+        n.classList.remove('hidden');
+        edges.forEach(function(e){
+          var na = byId(e.getAttribute('data-a')), nb = byId(e.getAttribute('data-b'));
+          if(na && nb && !na.classList.contains('hidden') && !nb.classList.contains('hidden')) e.classList.remove('hidden');
+        });
+      }, i*step));
+    });
+    timers.push(setTimeout(function(){ cap.textContent = '완성 — 강의가 개념 지도로 저장됐습니다 (Neo4j).'; }, ordered.length*step + 250));
+  }
+  function ask(){
+    clearTimers();
+    nodes.forEach(function(n){ n.classList.remove('hidden'); });
+    edges.forEach(function(e){ e.classList.remove('hidden'); });
+    var lit = ['c-gd','c-loss','c-bp','s1'];
+    cap.textContent = '질문: "경사하강법이 뭐야?" → 그래프에서 근거 검색(R)…';
+    nodes.forEach(function(n){ n.classList.add('dim'); n.classList.remove('lit'); });
+    edges.forEach(function(e){ e.classList.add('dim'); e.classList.remove('lit'); });
+    timers.push(setTimeout(function(){
+      lit.forEach(function(id){ var n = byId(id); if(n){ n.classList.remove('dim'); n.classList.add('lit'); } });
+      edges.forEach(function(e){ var a=e.getAttribute('data-a'), b=e.getAttribute('data-b'); if(lit.indexOf(a)>-1 && lit.indexOf(b)>-1){ e.classList.remove('dim'); e.classList.add('lit'); } });
+    }, reduce ? 0 : 550));
+    timers.push(setTimeout(function(){ cap.textContent = '근거 확보 → gpt-5.6가 그 근거로 답 생성(G). 이게 RAG.'; }, reduce ? 0 : 1700));
+  }
+  document.getElementById('btnIngest').addEventListener('click', ingest);
+  document.getElementById('btnAsk').addEventListener('click', ask);
+  document.getElementById('btnReset').addEventListener('click', reset);
+  reset();
+})();
+</script>
