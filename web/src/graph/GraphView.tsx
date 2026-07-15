@@ -26,6 +26,7 @@ import { mergeSubgraph } from './growth'
 import { GrowthRing, type GrowthPulse } from './GrowthRing'
 import { projectLabel } from './projectMeta'
 import { computeCrossLinks } from './crossLinks'
+import { makeMainRepel } from './mainRepel'
 
 const CROSS_BLUE = '#5FB6D4' // shared-concept bridge ring (matches render.ts)
 
@@ -82,38 +83,6 @@ function addMainNode(data: GraphData, label: string, project = ''): void {
     data.links.push({ source: mainId, target: s.id, relClass: 'next' })
   }
   data.nodes.push(main)
-}
-
-type SimNode = FNode & { vx?: number; vy?: number }
-
-/** A d3-force that pushes the "main" hubs VERY far apart (each topic cluster gets
- * its own region of the canvas). No-op with <2 hubs. */
-const MAIN_SEPARATION = 1300
-function makeMainRepel() {
-  let nodes: SimNode[] = []
-  const force = (alpha: number) => {
-    const mains = nodes.filter((n) => n.type === 'main')
-    for (let i = 0; i < mains.length; i++) {
-      for (let j = i + 1; j < mains.length; j++) {
-        const a = mains[i]
-        const b = mains[j]
-        const dx = (b.x ?? 0) - (a.x ?? 0)
-        const dy = (b.y ?? 0) - (a.y ?? 0)
-        const d = Math.hypot(dx, dy) || 0.01
-        if (d < MAIN_SEPARATION) {
-          const push = ((MAIN_SEPARATION - d) / d) * alpha * 0.5
-          a.vx = (a.vx ?? 0) - dx * push
-          a.vy = (a.vy ?? 0) - dy * push
-          b.vx = (b.vx ?? 0) + dx * push
-          b.vy = (b.vy ?? 0) + dy * push
-        }
-      }
-    }
-  }
-  ;(force as unknown as { initialize: (n: SimNode[]) => void }).initialize = (n) => {
-    nodes = n
-  }
-  return force
 }
 
 /** Imperative handle. Task 9 fills `growWith` (incremental session merge). Kept
@@ -569,11 +538,19 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
     [onSelectNode],
   )
 
-  // Elastic release: clear the drag pin so the node re-settles with its springs
-  // (during the drag force-graph sets fx/fy to follow the cursor — we undo it).
+  // Release behavior differs by tier:
+  //   • main hub → PIN where dropped (keep fx/fy). The user arranges topic
+  //     clusters by hand and they stay put; mainRepel skips pinned hubs, so
+  //     dragging one hub never shoves the others (the reported bug).
+  //   • sub-node → clear the pin so it re-settles elastically (Obsidian feel).
   const handleDragEnd = useCallback((node: NodeObject<FNode>) => {
-    node.fx = undefined
-    node.fy = undefined
+    if (node.type === 'main') {
+      node.fx = node.x
+      node.fy = node.y
+    } else {
+      node.fx = undefined
+      node.fy = undefined
+    }
   }, [])
 
   // ── Settle: fires when the engine calms (bounded by cooldownTicks) ─────────
