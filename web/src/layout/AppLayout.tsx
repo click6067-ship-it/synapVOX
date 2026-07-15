@@ -49,6 +49,17 @@ export default function AppLayout(): JSX.Element {
     return m ? decodeURIComponent(m[1]) : null
   }, [view, params, location.pathname])
 
+  // Which projects the graph is currently showing (for the sidebar's checkboxes
+  // to reflect a deep link / active galaxy). Empty outside graph mode.
+  const graphProjects = useMemo(() => {
+    if (view !== 'graph') return []
+    const pp = params.get('projects')
+    if (pp) return pp.split(',').map((s) => s.trim()).filter(Boolean)
+    if (params.get('scope') === 'all') return projects.map((p) => p.project)
+    const single = params.get('project')
+    return single ? [single] : []
+  }, [view, params, projects])
+
   // ── Navigation handlers ────────────────────────────────────────────────────
   const openGraph = useCallback(
     (s: 'project' | 'all', project?: string) => {
@@ -64,6 +75,16 @@ export default function AppLayout(): JSX.Element {
 
   const selectProject = useCallback(
     (p: string) => navigate(`/p/${encodeURIComponent(p)}`),
+    [navigate],
+  )
+
+  // 교차연결: visualize a checkbox-selected set of subjects together. One id → a
+  // single-project graph; two+ → the galaxy with cross-concept bridges.
+  const openGraphProjects = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return
+      navigate(`/graph?projects=${ids.map(encodeURIComponent).join(',')}`)
+    },
     [navigate],
   )
 
@@ -120,7 +141,9 @@ export default function AppLayout(): JSX.Element {
           onOpenUpload={openUpload}
           onFocusQuestion={focusQuestion}
           onOpenGraph={openGraph}
+          onOpenGraphProjects={openGraphProjects}
           onSelectProject={selectProject}
+          graphProjects={graphProjects}
         />
       </div>
 

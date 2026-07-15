@@ -713,6 +713,59 @@
   color: var(--session-red);
 }
 
+/* ── Checkbox row (함께 보기 / 교차연결 multi-select) ─────── */
+.appprojects__hint {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--sub);
+}
+.appprojects__hint strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+.appproj-row {
+  display: flex;
+  align-items: stretch;
+}
+.appproj-row .appproj {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.appproj-row.is-checked {
+  background: rgba(47, 111, 134, 0.06); /* rule-blue tint = queued for graph */
+}
+.appproj-row.is-checked .appproj__name {
+  color: var(--rule-blue);
+  font-weight: 600;
+}
+.appproj-check {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 15px;
+  height: 15px;
+  margin: 0 2px 0 4px;
+  accent-color: var(--rule-blue);
+  cursor: pointer;
+}
+/* Selection count on the 그래프 시각화 nav item */
+.navitem__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--paper);
+  background: var(--rule-blue);
+  border-radius: var(--r-1);
+  vertical-align: middle;
+}
+
 /* ── Foot (optional aggregate stat) ────────────────────── */
 .appfoot {
   padding-top: var(--space-3);

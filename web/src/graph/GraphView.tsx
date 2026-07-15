@@ -25,6 +25,9 @@ import { labelOpacity } from './lod'
 import { mergeSubgraph } from './growth'
 import { GrowthRing, type GrowthPulse } from './GrowthRing'
 import { projectLabel } from './projectMeta'
+import { computeCrossLinks } from './crossLinks'
+
+const CROSS_BLUE = '#5FB6D4' // shared-concept bridge ring (matches render.ts)
 
 const CANVAS_BG = '#07120F' // literal hex — canvas ctx can't read a CSS var
 const LABEL_INK = '#F4F0E7' // paper ink — readable label color on the dark canvas
@@ -124,7 +127,7 @@ export type GraphViewProps = {
   alsoShow?: string[] // other projects to render as additional main-hub clusters (galaxy)
   reloadKey?: number // bump → refetch
   onSelectNode?: (n: FNode) => void
-  onGraphMeta?: (m: { nodes: number; edges: number; settled: boolean }) => void
+  onGraphMeta?: (m: { nodes: number; edges: number; settled: boolean; cross?: number }) => void
   onSessions?: (sessions: FNode[]) => void // primary project's session nodes → sidebar list
   highlightId?: string | null // external highlight (e.g. sidebar hover) → same focus/dim as hover
   askExpansionIds?: Set<string> | null // P2 seam: temp RAG expansion subgraph highlight
@@ -152,6 +155,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
   const highlightNodesRef = useRef<Set<string>>(new Set())
   const highlightLinksRef = useRef<Set<FLink>>(new Set())
   const askIdsRef = useRef<Set<string> | null>(null) // RAG expansion nodes → persistent highlight
+  const crossIdsRef = useRef<Set<string> | null>(null) // concepts shared across projects (교차연결)
   const pointerRef = useRef({ x: 0, y: 0 })
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const pulseCounterRef = useRef(0) // monotonic id so each growth fires a fresh ring
@@ -269,10 +273,23 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
           realNodes += built.nodes.length // real (pre-hub) counts → accurate HUD
           realEdges += built.links.length
           if (p === project) primarySessions = built.nodes.filter((n) => n.type === 'session')
+          for (const n of built.nodes) n.project = p // tag for cross-project matching
           // One hub per project (namespaced when multiple coexist).
           addMainNode(built, projectLabel(p), multi ? p : '')
           merged.nodes.push(...built.nodes)
           merged.links.push(...built.links)
+        }
+        // 교차연결: when ≥2 projects are shown together, bridge concepts that
+        // appear in both (normalized-label exact match) with 'cross' links.
+        let crossCount = 0
+        crossIdsRef.current = null
+        if (multi) {
+          const cross = computeCrossLinks(merged.nodes)
+          if (cross.links.length) {
+            merged.links.push(...cross.links)
+            crossIdsRef.current = cross.crossIds
+            crossCount = cross.links.length
+          }
         }
         // Seed cached positions only in single-project mode (multi lets physics
         // place the clusters). Nodes stay FREE (no fx/fy).
@@ -292,7 +309,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
         maxDegreeRef.current = merged.nodes.reduce((m, n) => Math.max(m, n.degree), 1)
         setData(merged)
         setStatus('ready')
-        onGraphMeta?.({ nodes: realNodes, edges: realEdges, settled: false })
+        onGraphMeta?.({ nodes: realNodes, edges: realEdges, settled: false, cross: crossCount })
         onSessions?.(primarySessions)
       })
       .catch((e: unknown) => {
@@ -327,13 +344,35 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       // Hub→session links sit a bit longer so sessions orbit the main; concept
       // links stay tight.
       const link = fg.d3Force('link') as unknown as {
-        distance?: (fn: (l: { source: FNode | string; target: FNode | string }) => number) => unknown
+        distance?: (fn: (l: { source: FNode | string; target: FNode | string; relClass?: string }) => number) => unknown
+        strength?: (fn: (l: { source: FNode | string; target: FNode | string; relClass?: string }) => number) => unknown
       } | undefined
       link?.distance?.((l) => {
+        if (l.relClass === 'cross') return 260 // long bridge across the cluster gap
         const s = typeof l.source === 'object' ? l.source.type : undefined
         const t = typeof l.target === 'object' ? l.target.type : undefined
         return s === 'main' || t === 'main' ? 110 : 55
       })
+      // Cross links must be a WEAK, decorative bridge — strong enough to hint the
+      // connection, too weak to yank the clusters together. Real links keep d3's
+      // exact default strength (1/min(incident count)); we replicate it so their
+      // tuned elasticity is untouched. Only applied when a cross link exists.
+      const hasCross = data.links.some((l) => l.relClass === 'cross')
+      if (hasCross) {
+        const count: Record<string, number> = {}
+        for (const l of data.links) {
+          const s = endpointId(l.source)
+          const t = endpointId(l.target)
+          count[s] = (count[s] ?? 0) + 1
+          count[t] = (count[t] ?? 0) + 1
+        }
+        link?.strength?.((l) => {
+          if (l.relClass === 'cross') return 0.04
+          const s = endpointId(l.source)
+          const t = endpointId(l.target)
+          return 1 / Math.min(count[s] ?? 1, count[t] ?? 1)
+        })
+      }
       const charge = fg.d3Force('charge') as unknown as { strength?: (fn: (n: FNode) => number) => unknown } | undefined
       // Main hubs push hard (their clusters spread apart); sub-nodes as before.
       charge?.strength?.((n: FNode) => (n.type === 'main' ? -1400 : -30 - (n.degree ?? 0) * 8))
@@ -403,6 +442,16 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
         ctx.globalAlpha = 1
         ctx.lineWidth = 1.5 / globalScale
         ctx.strokeStyle = '#2F6F86'
+        ctx.beginPath()
+        ctx.arc(x, y, r + 3 / globalScale, 0, 2 * Math.PI)
+        ctx.stroke()
+      }
+      // 교차연결 marker: a bright rule-blue ring on concepts shared across projects
+      // (the "연결점" between two topics). Dims with the node on hover/ask.
+      if (!inAsk && crossIdsRef.current?.has(node.id)) {
+        ctx.globalAlpha = nodeAlpha
+        ctx.lineWidth = 1.6 / globalScale
+        ctx.strokeStyle = CROSS_BLUE
         ctx.beginPath()
         ctx.arc(x, y, r + 3 / globalScale, 0, 2 * Math.PI)
         ctx.stroke()
@@ -568,9 +617,17 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
           nodePointerAreaPaint={paintPointer}
           linkColor={linkColorAccessor}
           linkWidth={(l: LinkObject<FNode, FLink>) =>
-            l.relClass === 'next' || l.relClass === 'continues' ? 1.6 : l.relClass === 'mentions' ? 0.6 : 1
+            l.relClass === 'cross'
+              ? 1.4
+              : l.relClass === 'next' || l.relClass === 'continues'
+                ? 1.6
+                : l.relClass === 'mentions'
+                  ? 0.6
+                  : 1
           }
-          linkLineDash={(l: LinkObject<FNode, FLink>) => (l.relClass === 'mentions' ? [4, 3] : null)}
+          linkLineDash={(l: LinkObject<FNode, FLink>) =>
+            l.relClass === 'cross' ? [6, 4] : l.relClass === 'mentions' ? [4, 3] : null
+          }
           onNodeHover={handleNodeHover}
           onNodeClick={handleNodeClick}
           onEngineStop={handleEngineStop}
