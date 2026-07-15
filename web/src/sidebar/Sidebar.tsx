@@ -26,6 +26,9 @@ export function Sidebar(props: {
   onNewProject(): void
   onOpenUpload(): void
   onHoverSession(id: string | null): void
+  galaxy: boolean
+  canGalaxy: boolean
+  onToggleGalaxy(): void
 }): JSX.Element {
   const {
     project,
@@ -38,6 +41,9 @@ export function Sidebar(props: {
     onNewProject,
     onOpenUpload,
     onHoverSession,
+    galaxy,
+    canGalaxy,
+    onToggleGalaxy,
   } = props
 
   return (
@@ -88,6 +94,19 @@ export function Sidebar(props: {
         </span>
         {!collapsed && <span className="sidebar__add-text">강의 추가</span>}
       </button>
+
+      {canGalaxy && (
+        <button
+          type="button"
+          className={`sidebar__galaxy${galaxy ? ' sidebar__galaxy--on' : ''}${collapsed ? ' sidebar__galaxy--icon' : ''}`}
+          onClick={onToggleGalaxy}
+          aria-pressed={galaxy}
+          title="모든 과목 함께 보기"
+        >
+          <span aria-hidden="true">◎</span>
+          {!collapsed && <span>{galaxy ? '이 과목만 보기' : '모든 과목 함께'}</span>}
+        </button>
+      )}
 
       {!collapsed && (
         <div className="sidebar__seclabel">

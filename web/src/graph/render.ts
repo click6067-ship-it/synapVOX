@@ -16,16 +16,18 @@ const DEGREE_SCALE = 1.8
 /** Node radius in graph units. `base + sqrt(degree) * scale` — sqrt keeps hubs
  * visibly bigger without letting a single super-hub dwarf everything (linear
  * would). Strictly monotonic increasing in degree. */
-export function nodeRadius(degree: number, type: 'session' | 'concept'): number {
+export function nodeRadius(degree: number, type: 'session' | 'concept' | 'main'): number {
+  if (type === 'main') return 18 // the single project hub — always the biggest
   const base = type === 'session' ? SESSION_BASE : CONCEPT_BASE
   const d = Number.isFinite(degree) && degree > 0 ? degree : 0
   return base + Math.sqrt(d) * DEGREE_SCALE
 }
 
-/** Solid fill color for a node's core. `bridge` is accepted for future halo
- * emphasis (bridge concepts get a warmer halo in the draw layer) but does NOT
- * change the core hue — the core stays the canonical lime/vermilion. */
-export function nodeCoreColor(type: 'session' | 'concept', _bridge: boolean): string {
+/** Core/stroke color for a node. `main` = bright paper (the filled hub); session
+ * = vermilion, concept = lime (these two are drawn HOLLOW — the color is the
+ * outline). `bridge` accepted but does not change the hue. */
+export function nodeCoreColor(type: 'session' | 'concept' | 'main', _bridge: boolean): string {
+  if (type === 'main') return '#F4F0E7'
   return type === 'concept' ? '#D8FF6A' : '#C84E3A'
 }
 

@@ -97,6 +97,35 @@
   font-weight: 600;
   transition: background var(--dur-ui) ease, color var(--dur-ui) ease;
 }
+.sidebar__galaxy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: 7px 12px;
+  color: var(--sub);
+  background: transparent;
+  border: 1px dashed var(--rule);
+  border-radius: var(--r-1);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  transition: background var(--dur-ui) ease, color var(--dur-ui) ease, border-color var(--dur-ui) ease;
+}
+.sidebar__galaxy:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.sidebar__galaxy--on {
+  color: var(--ink);
+  border-style: solid;
+  border-color: var(--rule-blue);
+  background: rgba(47, 111, 134, 0.08);
+}
+.sidebar__galaxy--icon {
+  padding: 7px 0;
+}
 .sidebar__add-plus {
   color: var(--session-red);
   font-size: 14px;

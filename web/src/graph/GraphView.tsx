@@ -56,6 +56,69 @@ function withAlpha(color: string, alpha: number): string {
 type GraphData = { nodes: FNode[]; links: FLink[] }
 type FGRef = ForceGraphMethods<NodeObject<FNode>, LinkObject<FNode, FLink>>
 
+// Friendly display names for the project hubs. A project's group_id is a slug;
+// map the known demo projects to their topic name (fallback = the id itself).
+const PROJECT_LABELS: Record<string, string> = { 'P-BIO': '딥러닝', 'P-LIFE': '생명과학' }
+export function projectLabel(project: string): string {
+  return PROJECT_LABELS[project] ?? project
+}
+
+/** Inject ONE synthetic "main" hub for a project, linked to every session node,
+ * and mutate sessions' degree/neighbors so hover/LOD stay correct. The hub id is
+ * namespaced by project so multiple projects can coexist in one galaxy view.
+ * Sub-nodes (sessions + concepts) render hollow; the hub renders filled. */
+function addMainNode(data: GraphData, label: string, project = ''): void {
+  const sessions = data.nodes.filter((n) => n.type === 'session')
+  if (sessions.length === 0) return
+  const mainId = `__main__${project}`
+  const main: FNode = {
+    id: mainId,
+    type: 'main',
+    label,
+    bridge: false,
+    degree: sessions.length,
+    neighbors: new Set(sessions.map((s) => s.id)),
+  }
+  for (const s of sessions) {
+    s.neighbors.add(mainId)
+    s.degree += 1
+    data.links.push({ source: mainId, target: s.id, relClass: 'next' })
+  }
+  data.nodes.push(main)
+}
+
+type SimNode = FNode & { vx?: number; vy?: number }
+
+/** A d3-force that pushes the "main" hubs VERY far apart (each topic cluster gets
+ * its own region of the canvas). No-op with <2 hubs. */
+const MAIN_SEPARATION = 1300
+function makeMainRepel() {
+  let nodes: SimNode[] = []
+  const force = (alpha: number) => {
+    const mains = nodes.filter((n) => n.type === 'main')
+    for (let i = 0; i < mains.length; i++) {
+      for (let j = i + 1; j < mains.length; j++) {
+        const a = mains[i]
+        const b = mains[j]
+        const dx = (b.x ?? 0) - (a.x ?? 0)
+        const dy = (b.y ?? 0) - (a.y ?? 0)
+        const d = Math.hypot(dx, dy) || 0.01
+        if (d < MAIN_SEPARATION) {
+          const push = ((MAIN_SEPARATION - d) / d) * alpha * 0.5
+          a.vx = (a.vx ?? 0) - dx * push
+          a.vy = (a.vy ?? 0) - dy * push
+          b.vx = (b.vx ?? 0) + dx * push
+          b.vy = (b.vy ?? 0) + dy * push
+        }
+      }
+    }
+  }
+  ;(force as unknown as { initialize: (n: SimNode[]) => void }).initialize = (n) => {
+    nodes = n
+  }
+  return force
+}
+
 /** Imperative handle. Task 9 fills `growWith` (incremental session merge). Kept
  * as a clean seam now so callers can hold a ref without a later signature break. */
 export type GraphViewHandle = {
@@ -64,10 +127,11 @@ export type GraphViewHandle = {
 
 export type GraphViewProps = {
   project: string
+  alsoShow?: string[] // other projects to render as additional main-hub clusters (galaxy)
   reloadKey?: number // bump → refetch
   onSelectNode?: (n: FNode) => void
   onGraphMeta?: (m: { nodes: number; edges: number; settled: boolean }) => void
-  onSessions?: (sessions: FNode[]) => void // session nodes → sidebar list
+  onSessions?: (sessions: FNode[]) => void // primary project's session nodes → sidebar list
   highlightId?: string | null // external highlight (e.g. sidebar hover) → same focus/dim as hover
   askExpansionIds?: Set<string> | null // P2 seam: temp RAG expansion subgraph highlight
 }
@@ -75,7 +139,9 @@ export type GraphViewProps = {
 type Status = 'loading' | 'error' | 'ready'
 
 export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function GraphView(props, ref) {
-  const { project, reloadKey, onGraphMeta, onSelectNode, onSessions, highlightId } = props
+  const { project, alsoShow, reloadKey, onGraphMeta, onSelectNode, onSessions, highlightId } = props
+  // Stable key so the fetch effect re-runs only when the actual set changes.
+  const alsoKey = (alsoShow ?? []).slice().sort().join(',')
 
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const fgRef = useRef<FGRef | undefined>(undefined)
@@ -193,28 +259,47 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       if (!cancelled) setColdStart(true)
     }, COLD_START_MS)
 
-    getGraph(project)
-      .then((raw) => {
+    // Fetch the primary project + any galaxy extras; each becomes a main-hub
+    // cluster. Sub-nodes (sessions + concepts) render hollow, hubs filled, and
+    // the hubs repel each other strongly (mainRepel) → far-apart topic clusters.
+    const toFetch = [project, ...(alsoShow ?? [])].filter((p, i, a) => !!p && a.indexOf(p) === i)
+    const multi = toFetch.length > 1
+    Promise.all(toFetch.map((p) => getGraph(p).then((raw) => ({ p, built: buildForceData(mapGraph(raw)) }))))
+      .then((results) => {
         if (cancelled) return
-        const built = buildForceData(mapGraph(raw))
-        // P2: seed initial positions only — a good starting layout so the graph
-        // settles fast without an origin big-bang. Nodes stay FREE (no fx/fy).
-        const cached = loadPositions(project)
-        if (cached) {
-          for (const n of built.nodes) {
-            const p = cached[n.id]
-            if (p && Number.isFinite(p.x) && Number.isFinite(p.y)) {
-              n.x = p.x
-              n.y = p.y
+        const merged: GraphData = { nodes: [], links: [] }
+        let realNodes = 0
+        let realEdges = 0
+        let primarySessions: FNode[] = []
+        for (const { p, built } of results) {
+          realNodes += built.nodes.length // real (pre-hub) counts → accurate HUD
+          realEdges += built.links.length
+          if (p === project) primarySessions = built.nodes.filter((n) => n.type === 'session')
+          // One hub per project (namespaced when multiple coexist).
+          addMainNode(built, projectLabel(p), multi ? p : '')
+          merged.nodes.push(...built.nodes)
+          merged.links.push(...built.links)
+        }
+        // Seed cached positions only in single-project mode (multi lets physics
+        // place the clusters). Nodes stay FREE (no fx/fy).
+        if (!multi) {
+          const cached = loadPositions(project)
+          if (cached) {
+            for (const n of merged.nodes) {
+              const c = cached[n.id]
+              if (c && Number.isFinite(c.x) && Number.isFinite(c.y)) {
+                n.x = c.x
+                n.y = c.y
+              }
             }
           }
         }
-        dataRef.current = built
-        maxDegreeRef.current = built.nodes.reduce((m, n) => Math.max(m, n.degree), 1)
-        setData(built)
+        dataRef.current = merged
+        maxDegreeRef.current = merged.nodes.reduce((m, n) => Math.max(m, n.degree), 1)
+        setData(merged)
         setStatus('ready')
-        onGraphMeta?.({ nodes: built.nodes.length, edges: built.links.length, settled: false })
-        onSessions?.(built.nodes.filter((n) => n.type === 'session'))
+        onGraphMeta?.({ nodes: realNodes, edges: realEdges, settled: false })
+        onSessions?.(primarySessions)
       })
       .catch((e: unknown) => {
         if (cancelled) return
@@ -228,7 +313,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       cancelled = true
       clearTimeout(coldTimer)
     }
-  }, [project, reloadKey, retryTick, onGraphMeta])
+  }, [project, alsoKey, reloadKey, retryTick, onGraphMeta])
 
   // ── Tune d3-force like Obsidian, once per data load ───────────────────────
   // Runs after the graph mounts. Because ForceGraph2D only mounts once dims are
@@ -245,12 +330,23 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       }
       // d3Force returns a callable ForceFn (index-signature typed) — cast via
       // unknown to the d3 force accessors we actually call.
-      const link = fg.d3Force('link') as unknown as { distance?: (d: number) => unknown } | undefined
-      link?.distance?.(55)
+      // Hub→session links sit a bit longer so sessions orbit the main; concept
+      // links stay tight.
+      const link = fg.d3Force('link') as unknown as {
+        distance?: (fn: (l: { source: FNode | string; target: FNode | string }) => number) => unknown
+      } | undefined
+      link?.distance?.((l) => {
+        const s = typeof l.source === 'object' ? l.source.type : undefined
+        const t = typeof l.target === 'object' ? l.target.type : undefined
+        return s === 'main' || t === 'main' ? 110 : 55
+      })
       const charge = fg.d3Force('charge') as unknown as { strength?: (fn: (n: FNode) => number) => unknown } | undefined
-      charge?.strength?.((n: FNode) => -30 - (n.degree ?? 0) * 8)
+      // Main hubs push hard (their clusters spread apart); sub-nodes as before.
+      charge?.strength?.((n: FNode) => (n.type === 'main' ? -1400 : -30 - (n.degree ?? 0) * 8))
       const center = fg.d3Force('center') as unknown as { strength?: (s: number) => unknown } | undefined
-      center?.strength?.(0.05)
+      center?.strength?.(0.04)
+      // Custom force: keep the main hubs VERY far apart (galaxy of topics).
+      ;(fg.d3Force as unknown as (name: string, force: unknown) => void)('mainRepel', makeMainRepel())
       // Re-apply forces to the running sim (calm reheat — settles ~1.5–2s).
       fg.d3ReheatSimulation()
       // Dev-only test hook: exposes the graph instance + live node data so the
@@ -289,16 +385,25 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
         nodeAlpha = inAsk ? 1 : 0.1
       }
 
+      const isMain = node.type === 'main'
       ctx.save()
       ctx.globalAlpha = nodeAlpha
-      // Degree-based glow: hubs bloom more, capped so a super-hub doesn't flare.
-      // Dim the glow on backgrounded nodes so the focus reads clearly.
-      ctx.shadowBlur = Math.min(6 + degree * 1.5, 24) * (nodeAlpha < 0.5 ? 0.3 : 1)
-      ctx.shadowColor = color
       ctx.beginPath()
       ctx.arc(x, y, r, 0, 2 * Math.PI)
-      ctx.fillStyle = color
-      ctx.fill()
+      if (isMain) {
+        // Main hub (e.g. 딥러닝): FILLED + strong glow — the topic center.
+        ctx.shadowBlur = 22 * (nodeAlpha < 0.5 ? 0.3 : 1)
+        ctx.shadowColor = color
+        ctx.fillStyle = color
+        ctx.fill()
+      } else {
+        // Sub-nodes (sessions + concepts): HOLLOW — outline ring only, no fill.
+        ctx.shadowBlur = Math.min(4 + degree, 14) * (nodeAlpha < 0.5 ? 0.3 : 1)
+        ctx.shadowColor = color
+        ctx.lineWidth = 1.6 / globalScale
+        ctx.strokeStyle = color
+        ctx.stroke()
+      }
       // Evidence marker: a rule-blue ring around RAG-cited concepts.
       if (inAsk) {
         ctx.globalAlpha = 1
@@ -313,9 +418,11 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       // LOD labels: Task 8. Opacity only — the label position never changes, so
       // fading it in/out never shifts layout.
       const isFocused = node.id === hoverId || node.id === selectedIdRef.current || inAsk
-      // Session labels only when hovered/selected; concept labels ramp by zoom.
-      const lodAlpha =
-        node.type === 'session'
+      // Main hub label always on; session labels only when hovered/selected;
+      // concept labels ramp by zoom.
+      const lodAlpha = isMain
+        ? 1
+        : node.type === 'session'
           ? isFocused
             ? 1
             : 0
@@ -323,7 +430,7 @@ export const GraphView = forwardRef<GraphViewHandle, GraphViewProps>(function Gr
       // Backgrounded nodes' labels dim with them (so only the focus set reads).
       const labelAlpha = lodAlpha * (hovering || asking ? nodeAlpha : 1)
       if (labelAlpha > 0.02) {
-        const fontSize = 12 / globalScale // constant on-screen size (canvas is zoom-scaled)
+        const fontSize = (isMain ? 15 : 12) / globalScale // main label bigger; constant on-screen
         ctx.save()
         ctx.globalAlpha = labelAlpha
         ctx.font = `${fontSize}px ${LABEL_FONT}`

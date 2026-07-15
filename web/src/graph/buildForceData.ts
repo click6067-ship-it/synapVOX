@@ -7,7 +7,7 @@ import type { GraphNode, GraphLink, RelClass } from './mapGraph'
 
 export type FNode = {
   id: string
-  type: 'session' | 'concept'
+  type: 'session' | 'concept' | 'main' // 'main' = the single synthetic project hub
   label: string
   seq?: number
   bridge: boolean

@@ -32,6 +32,8 @@ export function useDetail(project: string): UseDetail {
 
   const open = useCallback(
     (node: FNode) => {
+      // The synthetic main hub has no backend detail — clicking it is a no-op.
+      if (node.type !== 'concept' && node.type !== 'session') return
       const kind = node.type // 'concept' | 'session'
       const reqId = ++reqIdRef.current
       setState({ status: 'loading', kind, label: node.label })

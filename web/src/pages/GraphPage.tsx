@@ -35,6 +35,7 @@ export default function GraphPage() {
   const [uploadMode, setUploadMode] = useState<'add' | 'new'>('add')
   const [panel, setPanel] = useState<'detail' | 'answer' | null>(null)
   const [askExpansion, setAskExpansion] = useState<Set<string> | null>(null)
+  const [galaxy, setGalaxy] = useState(false) // show all projects as far-apart hub clusters
 
   const graphRef = useRef<GraphViewHandle>(null)
 
@@ -126,6 +127,13 @@ export default function GraphPage() {
     [sessions.length, meta.nodes, meta.edges],
   )
 
+  // Galaxy: also render every OTHER project as its own far-apart hub cluster.
+  const alsoShow = useMemo(
+    () => (galaxy ? projects.map((p) => p.project).filter((p) => p !== project) : []),
+    [galaxy, projects, project],
+  )
+  const canOthers = projects.some((p) => p.project !== project)
+
   const sidebar = (
     <Sidebar
       project={project}
@@ -144,6 +152,9 @@ export default function GraphPage() {
         setUploadOpen(true)
       }}
       onHoverSession={setHoverSession}
+      galaxy={galaxy}
+      canGalaxy={canOthers}
+      onToggleGalaxy={() => setGalaxy((g) => !g)}
     />
   )
 
@@ -152,6 +163,7 @@ export default function GraphPage() {
       <GraphView
         ref={graphRef}
         project={project}
+        alsoShow={alsoShow}
         onGraphMeta={handleGraphMeta}
         onSessions={handleSessions}
         onSelectNode={handleSelectNode}
