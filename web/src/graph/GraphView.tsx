@@ -24,6 +24,7 @@ import { nodeRadius, nodeCoreColor, linkColor } from './render'
 import { labelOpacity } from './lod'
 import { mergeSubgraph } from './growth'
 import { GrowthRing, type GrowthPulse } from './GrowthRing'
+import { projectLabel } from './projectMeta'
 
 const CANVAS_BG = '#07120F' // literal hex — canvas ctx can't read a CSS var
 const LABEL_INK = '#F4F0E7' // paper ink — readable label color on the dark canvas
@@ -55,13 +56,6 @@ function withAlpha(color: string, alpha: number): string {
 
 type GraphData = { nodes: FNode[]; links: FLink[] }
 type FGRef = ForceGraphMethods<NodeObject<FNode>, LinkObject<FNode, FLink>>
-
-// Friendly display names for the project hubs. A project's group_id is a slug;
-// map the known demo projects to their topic name (fallback = the id itself).
-const PROJECT_LABELS: Record<string, string> = { 'P-BIO': '딥러닝', 'P-LIFE': '생명과학', 'P-ML': '머신러닝' }
-export function projectLabel(project: string): string {
-  return PROJECT_LABELS[project] ?? project
-}
 
 /** Inject ONE synthetic "main" hub for a project, linked to every session node,
  * and mutate sessions' degree/neighbors so hover/LOD stay correct. The hub id is
